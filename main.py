@@ -49,6 +49,7 @@ code=""
 funcdefs=""
 snippet=""
 nfunc=0
+funcdepth=0
 
 cmdrefs=[]
 def cmd(t):
@@ -86,22 +87,37 @@ sub rbx, 8
 mov qword [rbx], {cmd(t)}
 """
         case '@':
-            code+=snippet
-            snippet=""
-
             nextc()
             t=get_until(sep)
+            fname=f"f{nfunc}"
+            if t and t[-1]=='&':
+                t=t[:-1]
+                snippet+=f""";push func onto stack
+sub rbx, 8
+mov qword [rbx], {fname}
+"""
+
+            if funcdepth==0:
+                code+=snippet
+            else:
+                funcdefs+=snippet
+            snippet=""
+
             if t in cmds:
                 raise Exception(f"{line}:{char} attempt to shadow {t}")
 
-            fname=f"f{nfunc}"
+            snippet+=f"{fname}:\n"
             cmds[t]=fname
-            funcdefs+=f"{fname}:\n"
             nfunc+=1
+            funcdepth+=1
         case ';':
             nextc()
-            funcdefs+=snippet+"ret\n\n"
+            if funcdepth%2==1:
+                funcdefs+=snippet+"ret\n\n"
+            else:
+                funcdefs=snippet+"ret\n\n"+funcdefs
             snippet=""
+            funcdepth-=1
         case '.':
             nextc()
             t=get_until(sep)
