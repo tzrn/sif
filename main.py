@@ -42,9 +42,22 @@ cmds={
     "t": "true",
     "f": "false",
     "go": "go",
+    "np": "np",
 }
 
 code=""
+funcdefs=""
+snippet=""
+nanon=0
+
+cmdrefs=[]
+customcmds=[]
+def cmd(t):
+    if t in cmds:
+        return cmds[t]
+    cmdrefs.append((line,char,t))
+    return t
+
 while i<l:
     c=source[i]
     match c:
@@ -53,7 +66,7 @@ while i<l:
             s=get_until(['"'])
             nextc()
             n=len(data)
-            code += f""";load str
+            snippet += f""";load str
 sub rbx, 8
 mov qword [rbx], d{n}
 """
@@ -69,41 +82,64 @@ mov qword [rbx], d{n}
         case '&': # command adress
             nextc()
             t=get_until(sep)
-            if not t in cmds:
-                raise Exception(f"{line}:{char} command {t} does not exist")
-            code+=f""";load function pointer
+            snippet+=f""";load function pointer
 sub rbx, 8
-mov qword [rbx], {cmds[t]}
+mov qword [rbx], {cmd(t)}
 """
-            pass
         case ':':
-            #TODO function definition
-            pass
+            nextc()
+            t=get_until(sep)
+            if t in customcmds or t in cmds:
+                raise Exception(f"{line}:{char} attempt to shadow {t}")
+
+            after=""
+            if t=='':
+                t=f"_l{nanon}"
+                after=f""";push label of the lambda function onto the stack
+sub rbx, 8
+mov qword [rbx], {t}
+"""
+                nanon+=1
+            elif t[0]=='_':
+                raise Exception(f"{line}:{char} function name cannot start with _")
+            else:
+                customcmds.append(t)
+
+            funcdefs+=f"{t}:\n{snippet}ret\n\n"
+            snippet=after
         case '.':
             nextc()
             t=get_until(sep)
-            code+=f"call {cmds[t]}\n"
+            snippet+=f"call {cmd(t)}\n"
+        case '@':
+            nextc()
+            code+=snippet
+            snippet=""
         case _:
             t=get_until(sep)
             try:
                 t=float(t)
-                code+=f""";load num
+                snippet+=f""";load num
 sub rbx, 8
-mov qword[rbx], d{len(data)}\n"""
+mov qword [rbx], d{len(data)}\n"""
                 data.append(t)
             except ValueError:
                 raise Exception(f"{line}:{char} unexpected token '{t}'")
+
+for l, c, t in cmdrefs:
+    if not t in customcmds:
+        raise Exception(f"{l}:{c} reference to an undefined command {t}")
 
 init="""format ELF64 executable 3
 entry start
 
 segment readable writeable
-dstack rq 1024 ;reserve 1024 bytes
+dstack rq 1024 ;reserve 1024 qwords
 
 segment readable executable
 """
 
-funcdefs="""false:
+funcdefs+="""false:
 sub rbx, 8
 mov qword [rbx],0
 ret
@@ -117,6 +153,9 @@ go:
 mov rax, [rbx]
 add rbx, 8
 call rax
+ret
+
+np:
 ret
 
 strlen:
@@ -151,21 +190,25 @@ ret
 
 if_:
 add rbx, 8
-; v2 [v1] cond
-cmp qword [rbx-8], 0
-jz .false
+; cond [v1] v2
+cmp qword [rbx+8], 0
+jnz .true
 
+;false
+mov rax, [rbx-8]
+jmp .endif
+.true:
 mov rax, [rbx]
-mov [rbx+8], rax
 
-.false:
+.endif:
 add rbx, 8
+mov [rbx], rax
 ret
 """
 
 code="""start:
 lea rbx, [dstack+1000*8] ;load effective addres, top of the data stack
-"""+code+""";exit
+"""+code+snippet+""";exit
 mov rax, 60 ;exit
 xor rdi, rdi ;exit code
 syscall
@@ -175,8 +218,7 @@ dat="segment readable\n"
 for i in range(len(data)):
     t=data[i]
     if isinstance(data[i],str):
-        dat+=f'd{i} db "{t}", 10\n'
-        dat+=f'd{i}l dq $ - d{i}\n'
+        dat+=f'd{i} db "{t}", 10, 0\n'
     elif isinstance(data[i],float):
         dat+=f'd{i} dq {t}\n'
 
