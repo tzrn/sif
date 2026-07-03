@@ -48,10 +48,9 @@ cmds={
 code=""
 funcdefs=""
 snippet=""
-nanon=0
+nfunc=0
 
 cmdrefs=[]
-customcmds=[]
 def cmd(t):
     if t in cmds:
         return cmds[t]
@@ -75,7 +74,7 @@ mov qword [rbx], d{n}
             nextc()
         case '\n':
             nextl()
-        case ';':
+        case '#':
             while i<l and source[i]!='\n':
                 nextc()
             nextl()
@@ -86,35 +85,27 @@ mov qword [rbx], d{n}
 sub rbx, 8
 mov qword [rbx], {cmd(t)}
 """
-        case ':':
+        case '@':
+            code+=snippet
+            snippet=""
+
             nextc()
             t=get_until(sep)
-            if t in customcmds or t in cmds:
+            if t in cmds:
                 raise Exception(f"{line}:{char} attempt to shadow {t}")
 
-            after=""
-            if t=='':
-                t=f"_l{nanon}"
-                after=f""";push label of the lambda function onto the stack
-sub rbx, 8
-mov qword [rbx], {t}
-"""
-                nanon+=1
-            elif t[0]=='_':
-                raise Exception(f"{line}:{char} function name cannot start with _")
-            else:
-                customcmds.append(t)
-
-            funcdefs+=f"{t}:\n{snippet}ret\n\n"
-            snippet=after
+            fname=f"f{nfunc}"
+            cmds[t]=fname
+            funcdefs+=f"{fname}:\n"
+            nfunc+=1
+        case ';':
+            nextc()
+            funcdefs+=snippet+"ret\n\n"
+            snippet=""
         case '.':
             nextc()
             t=get_until(sep)
             snippet+=f"call {cmd(t)}\n"
-        case '@':
-            nextc()
-            code+=snippet
-            snippet=""
         case _:
             t=get_until(sep)
             try:
@@ -127,7 +118,7 @@ mov qword [rbx], d{len(data)}\n"""
                 raise Exception(f"{line}:{char} unexpected token '{t}'")
 
 for l, c, t in cmdrefs:
-    if not t in customcmds:
+    if not t in cmds:
         raise Exception(f"{l}:{c} reference to an undefined command {t}")
 
 init="""format ELF64 executable 3
@@ -223,3 +214,5 @@ for i in range(len(data)):
         dat+=f'd{i} dq {t}\n'
 
 print(init, funcdefs, code, dat, sep="\n", end="")
+
+# TODO: math, stack ops, forign functions
