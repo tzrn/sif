@@ -35,12 +35,13 @@ data=[]
 argregs=["rdi","rsi","rdx","rcx","r8","r9"]
 sep=["\n"," ","\t"]
 
-funcs={
+cmds={
     "pr": "print",
     ".": "endmarker",
     "if": "if_",
     "t": "true",
     "f": "false",
+    "go": "go",
 }
 
 code=""
@@ -65,13 +66,23 @@ mov qword [rbx], d{n}
             while i<l and source[i]!='\n':
                 nextc()
             nextl()
+        case '&': # command adress
+            nextc()
+            t=get_until(sep)
+            if not t in cmds:
+                raise Exception(f"{line}:{char} command {t} does not exist")
+            code+=f""";load function pointer
+sub rbx, 8
+mov qword [rbx], {cmds[t]}
+"""
+            pass
         case ':':
             #TODO function definition
             pass
         case '.':
             nextc()
             t=get_until(sep)
-            code+=f"call {funcs[t]}\n"
+            code+=f"call {cmds[t]}\n"
         case _:
             t=get_until(sep)
             try:
@@ -102,6 +113,12 @@ sub rbx, 8
 mov qword [rbx],1
 ret
 
+go:
+mov rax, [rbx]
+add rbx, 8
+call rax
+ret
+
 strlen:
 mov rax, rdi
 .start:
@@ -110,13 +127,13 @@ mov rax, rdi
     inc rdi
     jmp .start
 .endl:
-    sub rax, rdi
-    neg rax
+    sub rdi, rax
+    mov rax, rdi
     inc rax
 ret
 
 print:
-mov rdi, rbx
+mov rdi, [rbx]
 call strlen
 mov rdx, rax ;string len
 
@@ -134,20 +151,15 @@ ret
 
 if_:
 add rbx, 8
-; cond [v1] v2
-cmp qword [rbx+8], 0
+; v2 [v1] cond
+cmp qword [rbx-8], 0
 jz .false
 
-;true:
 mov rax, [rbx]
-jmp .endif
+mov [rbx+8], rax
 
 .false:
-mov rax,[rbx-8]
-
-.endif:
 add rbx, 8
-mov [rbx], rax
 ret
 """
 
