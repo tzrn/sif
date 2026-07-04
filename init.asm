@@ -42,6 +42,12 @@ go:
 	call    rax
 	ret
 
+jump:
+	mov     rax, [rbx]
+	add     rbx, 8
+	jmp     rax
+	ret
+
 np:
 	ret
 

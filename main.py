@@ -53,14 +53,12 @@ cmds = {
     "add": "sum",
     "ipr": "print_int",
     "dup": "dupl",
+    "jmp": "jump",
 }
 
-code = ""
-funcdefs = ""
-snippet = ""
+code = ["", ""]  # function definitions, main code
 nfunc = 0
-funcdepth = 0
-
+depth = 1
 cmdrefs = []
 
 
@@ -71,11 +69,17 @@ def cmd(t):
     return t
 
 
+def emit(s):
+    code[depth] += s
+
+
 def push(op):
-    return f"""
+    emit(
+        f"""
 sub rbx, 8
 mov qword [rbx], {op}
 """
+    )
 
 
 while i < l:
@@ -86,7 +90,7 @@ while i < l:
             s = get_until(['"'])
             nextc()
             n = len(data)
-            snippet += push(f"d{n}")
+            push(f"d{n}")
             data.append(s)
         case " " | "\t":
             nextc()
@@ -99,49 +103,46 @@ while i < l:
         case "&":  # command adress
             nextc()
             t = get_until(sep)
-            snippet += push(cmd(t))
+            push(cmd(t))
         case "@":
+            code.append("")
+            depth += 1
+
             nextc()
             t = get_until(sep)
             fname = f"f{nfunc}"
             if t and t[-1] == "&":
                 t = t[:-1]
-                snippet += push(fname)
-
-            if funcdepth == 0:
-                code += snippet
-            else:
-                funcdefs += snippet
-            snippet = ""
+                depth -= 1
+                push(fname)
+                depth += 1
 
             if t in cmds:
                 raise Exception(f"{line}:{char} attempt to shadow {t}")
 
-            snippet += f"{fname}:\n"
+            emit(f"{fname}:\n")
             if t != "":  # lambda
                 cmds[t] = fname
             nfunc += 1
-            funcdepth += 1
         case ";":
             nextc()
-            if funcdepth % 2 == 1:
-                funcdefs += snippet + "ret\n\n"
-            else:
-                funcdefs = snippet + "ret\n\n" + funcdefs
-            snippet = ""
-            funcdepth -= 1
+            emit("ret\n\n")
+            code[0] += code.pop()
+            depth -= 1
         case ".":
             nextc()
             t = get_until(sep)
-            snippet += f"call {cmd(t)}\n"
+            emit(f"call {cmd(t)}\n")
         case _:
             t = get_until(sep)
             try:
                 t = int(t)
-                snippet += f"""mov rax, [d{len(data)}]
+                emit(
+                    f"""mov rax, [d{len(data)}]
 sub rbx, 8
 mov [rbx], rax
 """
+                )
                 data.append(t)
             except ValueError:
                 raise Exception(f"{line}:{char} unexpected token '{t}'")
@@ -170,4 +171,4 @@ for i in range(len(data)):
     elif isinstance(data[i], int):
         dat += f"d{i} dq {t}\n"
 
-print(init, funcdefs, start, code, snippet, end, dat, sep="\n", end="")
+print(init, code[0], start, code[1], end, dat, sep="\n", end="")
