@@ -33,7 +33,7 @@ def get_until(endings):
 
 data=[]
 argregs=["rdi","rsi","rdx","rcx","r8","r9"]
-sep=["\n"," ","\t"]
+sep=["\n"," ","\t",";"]
 
 cmds={
     "pr": "print",
@@ -42,7 +42,11 @@ cmds={
     "t": "true",
     "f": "false",
     "go": "go",
-    "np": "np",
+    "nop": "np",
+    "sub": "subtract",
+    "add": "sum",
+    "ipr": "print_int",
+    "dup": "dupl",
 }
 
 code=""
@@ -58,6 +62,12 @@ def cmd(t):
     cmdrefs.append((line,char,t))
     return t
 
+def push(op):
+    return f"""
+sub rbx, 8
+mov qword [rbx], {op}
+"""
+
 while i<l:
     c=source[i]
     match c:
@@ -66,10 +76,7 @@ while i<l:
             s=get_until(['"'])
             nextc()
             n=len(data)
-            snippet += f""";load str
-sub rbx, 8
-mov qword [rbx], d{n}
-"""
+            snippet+=push(f"d{n}")
             data.append(s)
         case ' ' | "\t":
             nextc()
@@ -82,20 +89,14 @@ mov qword [rbx], d{n}
         case '&': # command adress
             nextc()
             t=get_until(sep)
-            snippet+=f""";load function pointer
-sub rbx, 8
-mov qword [rbx], {cmd(t)}
-"""
+            snippet+=push(cmd(t))
         case '@':
             nextc()
             t=get_until(sep)
             fname=f"f{nfunc}"
             if t and t[-1]=='&':
                 t=t[:-1]
-                snippet+=f""";push func onto stack
-sub rbx, 8
-mov qword [rbx], {fname}
-"""
+                snippet+=push(fname)
 
             if funcdepth==0:
                 code+=snippet
@@ -107,7 +108,8 @@ mov qword [rbx], {fname}
                 raise Exception(f"{line}:{char} attempt to shadow {t}")
 
             snippet+=f"{fname}:\n"
-            cmds[t]=fname
+            if t!="": #lambda
+                cmds[t]=fname
             nfunc+=1
             funcdepth+=1
         case ';':
@@ -125,10 +127,11 @@ mov qword [rbx], {fname}
         case _:
             t=get_until(sep)
             try:
-                t=float(t)
-                snippet+=f""";load num
+                t=int(t)
+                snippet+=f"""mov rax, [d{len(data)}]
 sub rbx, 8
-mov qword [rbx], d{len(data)}\n"""
+mov [rbx], rax
+"""
                 data.append(t)
             except ValueError:
                 raise Exception(f"{line}:{char} unexpected token '{t}'")
@@ -137,85 +140,13 @@ for l, c, t in cmdrefs:
     if not t in cmds:
         raise Exception(f"{l}:{c} reference to an undefined command {t}")
 
-init="""format ELF64 executable 3
-entry start
+with open("init.asm", "r") as f:
+    init=f.read()
 
-segment readable writeable
-dstack rq 1024 ;reserve 1024 qwords
+start="""start:
+lea rbx, [dstack+1000*8] ;load effective address, top of the data stack"""
 
-segment readable executable
-"""
-
-funcdefs+="""false:
-sub rbx, 8
-mov qword [rbx],0
-ret
-
-true:
-sub rbx, 8
-mov qword [rbx],1
-ret
-
-go:
-mov rax, [rbx]
-add rbx, 8
-call rax
-ret
-
-np:
-ret
-
-strlen:
-mov rax, rdi
-.start:
-    cmp byte [rdi], 0
-    jz .endl
-    inc rdi
-    jmp .start
-.endl:
-    sub rdi, rax
-    mov rax, rdi
-    inc rax
-ret
-
-print:
-mov rdi, [rbx]
-call strlen
-mov rdx, rax ;string len
-
-mov rax, 1 ;sys_write
-mov rdi, 1 ;stdout
-mov rsi, [rbx] ;string
-add rbx, 8
-syscall
-ret
-
-endmarker:
-sub rbx, 8
-mov qword [rbx], 0
-ret
-
-if_:
-add rbx, 8
-; cond [v1] v2
-cmp qword [rbx+8], 0
-jnz .true
-
-;false
-mov rax, [rbx-8]
-jmp .endif
-.true:
-mov rax, [rbx]
-
-.endif:
-add rbx, 8
-mov [rbx], rax
-ret
-"""
-
-code="""start:
-lea rbx, [dstack+1000*8] ;load effective addres, top of the data stack
-"""+code+snippet+""";exit
+end=""";exit
 mov rax, 60 ;exit
 xor rdi, rdi ;exit code
 syscall
@@ -226,9 +157,7 @@ for i in range(len(data)):
     t=data[i]
     if isinstance(data[i],str):
         dat+=f'd{i} db "{t}", 10, 0\n'
-    elif isinstance(data[i],float):
+    elif isinstance(data[i],int):
         dat+=f'd{i} dq {t}\n'
 
-print(init, funcdefs, code, dat, sep="\n", end="")
-
-# TODO: math, stack ops, forign functions
+print(init, funcdefs, start, code, snippet, end, dat, sep="\n", end="")
