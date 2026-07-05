@@ -195,17 +195,36 @@ while i < l:
             f, typ = cmd(t)
 
             n = len(typestack)
-            if n < len(typ[0]):
+            params = typ[0]
+            if n < len(params):
                 err(f"function {t} requires {typ} but stack is too small: {typestack}")
 
-            for param in typ[0]:
-                n -= 1
-                if not isinstance(param, int) and param != typestack[n]:
-                    err(f"function {t} requires {typ} but your stack is: {typestack}")
-            typestack = typestack[: n - 1]
+            generics = {}
+            n -= len(params)
+            ret = []
+            for param in params:
+                if isinstance(param, int):
+                    if param in generics and generics[param] != typestack[n]:
+                        err(f"generic type '{param}' was given different types")
+                    else:
+                        generics[param] = typestack[n]
+                elif param != typestack[n]:
+                    err(
+                        f"function {t} requires {params} but the top of your stack is: {typestack[-len(params):]}"
+                    )
+                n += 1
+            typestack = typestack[: -len(params)]
 
+            for ret in typ[1]:
+                if isinstance(ret, int):
+                    if not ret in generics:
+                        err(
+                            f"you cannot use generic '{ret}' because it wasn't in {t}'s inputs"
+                        )
+                    typestack.append(generics[ret])
+                else:
+                    typestack.append(ret)
             emit(f"call {f}\n")
-            typestack += typ[1]
         case _:
             t = get_until(sep)
             try:
