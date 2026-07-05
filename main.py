@@ -20,66 +20,103 @@ def nextl():
     char = 1
 
 
+def err(text):
+    raise Exception(f"{line}:{char} {text}")
+
+
 def get_until(endings):
-    startline = line
+    global c, line
+    startline, startchar = line, char
     s = ""
     while True:
-        if i >= l:
-            raise Exception(
-                f"{line}:{char} token that starts on line {startline} is not terminated by {endings}"
+        if i >= l or source[i] == "#":
+            err(
+                f"token that starts on line {startline}:{startchar} expects any of [{endings}] to follow it"
             )
         c = source[i]
-        if c == "\n":
-            nextl()
         if c in endings:
             return s
+        if c == "\n":
+            line += 1
         s += c
         nextc()
 
 
-data = []
-argregs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"]
-sep = ["\n", " ", "\t", ";"]
-
 cmds = {
-    "pr": "print",
-    ".": "endmarker",
-    "if": "if_",
-    "t": "true",
-    "f": "false",
-    "go": "go",
-    "nop": "np",
-    "sub": "subtract",
-    "add": "sum",
-    "ipr": "print_int",
-    "dup": "dupl",
-    "jmp": "jump",
+    "pr": ("print", ([str], [])),
+    ".": ("endmarker", ([], [])),
+    "if": ("if_", ([int, 1, 1], [1])),
+    "nop": ("np", ([], [])),
+    "sub": ("subtract", ([int, int], [int])),
+    "add": ("sum", ([int, int], [int])),
+    "ipr": ("print_int", ([int], [])),
+    "dup": ("dupl", ([1], [1, 1])),
+    # * "go": ("go",),
+    # ! "jmp": ("jump", ([any], [])),
 }
 
-code = ["", ""]  # function definitions, main code
 nfunc = 0
-depth = 1
-cmdrefs = []
+data = []
+funcstack = []
+typestack = []
+funcdefs = ""
+code = [""]
+sep = ["\n", " ", "\t"]
 
 
 def cmd(t):
     if t in cmds:
         return cmds[t]
-    cmdrefs.append((line, char, t))
     return t
 
 
 def emit(s):
-    code[depth] += s
+    code[len(funcstack)] += s
 
 
-def push(op):
+def push(val, typ):
     emit(
         f"""
-sub rbx, 8
-mov qword [rbx], {op}
+sub rbx, 8 ; push {typ} onto stack
+mov qword [rbx], {val}
 """
     )
+    typestack.append(typ)
+
+
+types = {
+    "int": int,
+    "str": str,
+}
+
+
+def get_type(t):
+    if t in types:
+        return types[t]
+    raise err(f"invalid type {t}")
+
+
+def read_type():
+    def read_func():
+        t = []
+        while source[i] != "]":
+            nextc()
+            t.append(read_type())
+        nextc()
+        return t
+
+    if source[i] == "[":
+        param = read_func()
+        ret = []
+        if source[i] == "[":
+            ret = read_func()
+        return (param, ret)
+    else:
+        t = get_until([",", "]"])
+        try:
+            return int(t)
+        except ValueError:
+            return get_type(t)
 
 
 while i < l:
@@ -90,69 +127,94 @@ while i < l:
             s = get_until(['"'])
             nextc()
             n = len(data)
-            push(f"d{n}")
+            push(f"d{n}", str)
             data.append(s)
         case " " | "\t":
             nextc()
         case "\n":
             nextl()
         case "#":
-            while i < l and source[i] != "\n":
-                nextc()
+            nextc()
+            get_until("\n")
             nextl()
         case "&":  # command adress
             nextc()
-            t = get_until(sep)
-            push(cmd(t))
+            push(*cmd(get_until(sep)))
         case "@":
             code.append("")
-            depth += 1
 
             nextc()
-            t = get_until(sep)
-            fname = f"f{nfunc}"
-            if t and t[-1] == "&":
-                t = t[:-1]
-                depth -= 1
-                push(fname)
-                depth += 1
+            f = get_until(["["])
+            typ = read_type()
+            if f in cmds:
+                err(f"attempt to shadow {t}")
+            funcstack.append((f, typ[1], len(typestack)))
+            typestack += typ[1]
 
-            if t in cmds:
-                raise Exception(f"{line}:{char} attempt to shadow {t}")
+            fname = f"f{nfunc}"
+            if f and f[-1] == "&":
+                f = f[:-1]
+                curr = funcstack.pop()
+                push(fname, typ)
+                funcstack.append(curr)
 
             emit(f"{fname}:\n")
-            if t != "":  # lambda
-                cmds[t] = fname
+            if f != "":  # otherwise lambda
+                cmds[f] = (fname, typ)
             nfunc += 1
-        case ";":
+        case ";":  # TODO: check that the ret from funcstack.pop matches the stack
             nextc()
             emit("ret\n\n")
-            code[0] += code.pop()
-            depth -= 1
+            funcdefs += code.pop()
+            f, ret, frame_start = funcstack.pop()
+            retlen = len(ret)
+
+            n = len(typestack)
+            for val in ret:
+                n -= 1
+                if not typestack or val != typestack[n]:
+                    err(
+                        f"function {f} must return {ret} but top of your stack is {typestack[-len(ret):]}"
+                    )
+
+            typestack = typestack[:-retlen]
+            lendiff = len(typestack) - frame_start
+            if lendiff < 0:
+                err(
+                    f"function {f} must return {ret} but you are {-lendiff} values short"
+                )
+            if lendiff > 0:
+                err(
+                    f"function {f} must return {ret} but you pushed {lendiff} values too many"
+                )
         case ".":
             nextc()
             t = get_until(sep)
-            emit(f"call {cmd(t)}\n")
+            if not t in cmds:
+                err(f"undefined function {t}")
+            f, typ = cmd(t)
+
+            n = len(typestack)
+            if n < len(typ[0]):
+                err(f"function {t} requires {typ} but stack is too small: {typestack}")
+
+            for param in typ[0]:
+                n -= 1
+                if not isinstance(param, int) and param != typestack[n]:
+                    err(f"function {t} requires {typ} but your stack is: {typestack}")
+            typestack = typestack[: n - 1]
+
+            emit(f"call {f}\n")
+            typestack += typ[1]
         case _:
             t = get_until(sep)
             try:
                 t = int(t)
-                emit(
-                    f"""mov rax, [d{len(data)}]
-sub rbx, 8
-mov [rbx], rax
-"""
-                )
+                emit(f"mov rax, [d{len(data)}]")
+                push("rax", int)
                 data.append(t)
             except ValueError:
-                raise Exception(f"{line}:{char} unexpected token '{t}'")
-
-for l, c, t in cmdrefs:
-    if not t in cmds:
-        raise Exception(f"{l}:{c} reference to an undefined command {t}")
-
-with open("init.asm", "r") as f:
-    init = f.read()
+                err(f"unexpected token '{t}'")
 
 start = """start:
 lea rbx, [dstack+1000*8] ;load effective address, top of the data stack"""
@@ -171,4 +233,5 @@ for i in range(len(data)):
     elif isinstance(data[i], int):
         dat += f"d{i} dq {t}\n"
 
-print(init, code[0], start, code[1], end, dat, sep="\n", end="")
+with open("init.asm", "r") as init:
+    print(init.read(), funcdefs, start, code[0], end, dat, sep="\n", end="")
