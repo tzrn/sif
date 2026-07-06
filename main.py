@@ -1,4 +1,4 @@
-with open("source.ft", "r") as f:
+with open("source.sif", "r") as f:
     source = f.read() + " "
 
 i = 0
@@ -21,7 +21,7 @@ def nextl():
 
 
 def err(text):
-    raise Exception(f"{line}:{char} {text}")
+    raise Exception(f"\033[31m{line}:{char} {text}\033[0m")
 
 
 def get_until(endings):
@@ -51,8 +51,10 @@ cmds = {
     "add": ("sum", ([int, int], [int])),
     "ipr": ("print_int", ([int], [])),
     "dup": ("dupl", ([1], [1, 1])),
-    # * "go": ("go",),
-    # ! "jmp": ("jump", ([any], [])),
+    "swap": ("swap", ([1, 2], [2, 1])),
+    # special logic in case "."
+    "jmp": ("jump", ([1], [])),
+    "go": ("go", ([1], [])),
 }
 
 nfunc = 0
@@ -110,6 +112,9 @@ def read_type():
         ret = []
         if source[i] == "[":
             ret = read_func()
+            for r in ret:
+                if isinstance(r, int) and not r in param:
+                    err(f"you cannot use generic '{ret}' because it wasn't in inputs")
         return (param, ret)
     else:
         t = get_until([",", "]"])
@@ -148,21 +153,20 @@ while i < l:
             typ = read_type()
             if f in cmds:
                 err(f"attempt to shadow {t}")
-            funcstack.append((f, typ[1], len(typestack)))
-            typestack += typ[1]
 
             fname = f"f{nfunc}"
-            if f and f[-1] == "&":
-                f = f[:-1]
-                curr = funcstack.pop()
+            if i < l and source[i] == "&":
+                nextc()
                 push(fname, typ)
-                funcstack.append(curr)
+
+            funcstack.append((f, typ[1], len(typestack)))
+            typestack += typ[0]
 
             emit(f"{fname}:\n")
             if f != "":  # otherwise lambda
                 cmds[f] = (fname, typ)
             nfunc += 1
-        case ";":  # TODO: check that the ret from funcstack.pop matches the stack
+        case ";":
             nextc()
             emit("ret\n\n")
             funcdefs += code.pop()
@@ -177,6 +181,7 @@ while i < l:
                         f"function {f} must return {ret} but top of your stack is {typestack[-len(ret):]}"
                     )
 
+            # print(len(typestack), frame_start, len(typestack) - frame_start)
             typestack = typestack[:-retlen]
             lendiff = len(typestack) - frame_start
             if lendiff < 0:
@@ -185,7 +190,7 @@ while i < l:
                 )
             if lendiff > 0:
                 err(
-                    f"function {f} must return {ret} but you pushed {lendiff} values too many"
+                    f"function {f} must return {ret} but you pushed {lendiff} values too many {typestack}"
                 )
         case ".":
             nextc()
@@ -197,7 +202,15 @@ while i < l:
             n = len(typestack)
             params = typ[0]
             if n < len(params):
-                err(f"function {t} requires {typ} but stack is too small: {typestack}")
+                err(
+                    f"function {t} requires {typ[0]} but the stack is too short: {typestack}"
+                )
+            if t == "jmp" or t == "go":
+                callee = typestack.pop()
+                n -= 1
+                if not isinstance(callee, tuple):
+                    err(f"{t} takes a function, but got {params}")
+                params = callee[0]
 
             generics = {}
             n -= len(params)
@@ -213,18 +226,19 @@ while i < l:
                         f"function {t} requires {params} but the top of your stack is: {typestack[-len(params):]}"
                     )
                 n += 1
-            typestack = typestack[: -len(params)]
 
+            if not (t == "jmp" or t == "go"):
+                typestack = typestack[: -len(params)]
             for ret in typ[1]:
                 if isinstance(ret, int):
-                    if not ret in generics:
-                        err(
-                            f"you cannot use generic '{ret}' because it wasn't in {t}'s inputs"
-                        )
                     typestack.append(generics[ret])
                 else:
                     typestack.append(ret)
             emit(f"call {f}\n")
+        case ",":
+            nextc()
+            typestack.pop()
+            emit("add rbx, 8 ;drop\n")
         case _:
             t = get_until(sep)
             try:
