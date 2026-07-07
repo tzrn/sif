@@ -29,7 +29,7 @@ def get_until(endings):
     startline, startchar = line, char
     s = ""
     while True:
-        if i >= l or source[i] == "#":
+        if i >= l:
             err(
                 f"token that starts on line {startline}:{startchar} expects any of [{endings}] to follow it"
             )
@@ -44,7 +44,6 @@ def get_until(endings):
 
 cmds = {
     "pr": ("print", ([str], [])),
-    ".": ("endmarker", ([], [])),
     "if": ("if_", ([int, 1, 1], [1])),
     "nop": ("np", ([], [])),
     "sub": ("subtract", ([int, int], [int])),
@@ -52,6 +51,7 @@ cmds = {
     "ipr": ("print_int", ([int], [])),
     "dup": ("dupl", ([1], [1, 1])),
     "swap": ("swap", ([1, 2], [2, 1])),
+    "drop": ("drop", ([1], [])),
     # special logic in case "."
     "jmp": ("jump", ([1], [])),
     "go": ("go", ([1], [])),
@@ -63,7 +63,7 @@ funcstack = []
 typestack = []
 funcdefs = ""
 code = [""]
-sep = ["\n", " ", "\t"]
+sep = ["\n", " ", "\t", "("]
 
 
 def cmd(t):
@@ -98,12 +98,14 @@ def get_type(t):
     raise err(f"invalid type {t}")
 
 
-def read_type():
+def read_signiture():
     def read_func():
         t = []
+        nextc()
         while source[i] != "]":
-            nextc()
-            t.append(read_type())
+            t.append(read_signiture())
+            if source[i] == ",":
+                nextc()
         nextc()
         return t
 
@@ -138,25 +140,26 @@ while i < l:
             nextc()
         case "\n":
             nextl()
-        case "#":
+        case "(":
             nextc()
-            get_until("\n")
-            nextl()
+            get_until(")")
+            nextc()
         case "&":  # command adress
             nextc()
             push(*cmd(get_until(sep)))
         case "@":
+            nextc()
             code.append("")
 
-            nextc()
             f = get_until(["["])
-            typ = read_type()
+            typ = read_signiture()
             if f in cmds:
                 err(f"attempt to shadow {t}")
 
             fname = f"f{nfunc}"
-            if i < l and source[i] == "&":
-                nextc()
+            if f == "" or source[i] == "&":
+                if source[i] == "&":
+                    nextc()
                 push(fname, typ)
 
             funcstack.append((f, typ[1], len(typestack)))
@@ -178,67 +181,63 @@ while i < l:
                 n -= 1
                 if not typestack or val != typestack[n]:
                     err(
-                        f"function {f} must return {ret} but top of your stack is {typestack[-len(ret):]}"
+                        f"function @{f} must return {ret} but top of your stack is {typestack[-len(ret):]}"
                     )
 
-            # print(len(typestack), frame_start, len(typestack) - frame_start)
-            typestack = typestack[:-retlen]
+            # print(len(typestack), frame_start, len(typestack) - frame_start, retlen)
+            typestack = typestack[: len(typestack) - retlen]
             lendiff = len(typestack) - frame_start
             if lendiff < 0:
                 err(
-                    f"function {f} must return {ret} but you are {-lendiff} values short"
+                    f"function @{f} must return {ret} but you are {-lendiff} values short"
                 )
             if lendiff > 0:
                 err(
-                    f"function {f} must return {ret} but you pushed {lendiff} values too many {typestack}"
+                    f"function @{f} must return {ret} but you return {lendiff} values too many {typestack}"
                 )
         case ".":
             nextc()
             t = get_until(sep)
             if not t in cmds:
                 err(f"undefined function {t}")
-            f, typ = cmd(t)
+            f, (params, rets) = cmd(t)
+            # print(f"calling {t}, {typestack}")
 
             n = len(typestack)
-            params = typ[0]
             if n < len(params):
                 err(
-                    f"function {t} requires {typ[0]} but the stack is too short: {typestack}"
+                    f"function @{t} requires {typ[0]} but the stack is too short: {typestack}"
                 )
             if t == "jmp" or t == "go":
                 callee = typestack.pop()
                 n -= 1
                 if not isinstance(callee, tuple):
-                    err(f"{t} takes a function, but got {params}")
-                params = callee[0]
+                    err(f"{t} takes a function, but got {callee}")
+                params, rets = callee
 
             generics = {}
             n -= len(params)
-            ret = []
             for param in params:
                 if isinstance(param, int):
                     if param in generics and generics[param] != typestack[n]:
-                        err(f"generic type '{param}' was given different types")
+                        err(
+                            f"generic type '{param}' was given different types - {typestack[n]} and {generics[param]} when calling @{t}"
+                        )
                     else:
                         generics[param] = typestack[n]
                 elif param != typestack[n]:
                     err(
-                        f"function {t} requires {params} but the top of your stack is: {typestack[-len(params):]}"
+                        f"function @{t} requires {params} but the top of your stack is: {typestack[-len(params):]}"
                     )
                 n += 1
 
-            if not (t == "jmp" or t == "go"):
-                typestack = typestack[: -len(params)]
-            for ret in typ[1]:
+            typestack = typestack[: len(typestack) - len(params)]
+            for ret in rets:
                 if isinstance(ret, int):
                     typestack.append(generics[ret])
                 else:
                     typestack.append(ret)
             emit(f"call {f}\n")
-        case ",":
-            nextc()
-            typestack.pop()
-            emit("add rbx, 8 ;drop\n")
         case _:
             t = get_until(sep)
             try:

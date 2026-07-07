@@ -51,12 +51,6 @@ jump:
 np:
 	ret
 
-endmarker:
-	sub     rbx, 8
-	mov     qword [rbx], 0
-	ret
-
-
 ;; ARITHMETIC
 sum:
 	mov     rax, [rbx]
@@ -142,6 +136,10 @@ dupl:
 	mov     qword rax, [rbx]
 	sub     rbx, 8
 	mov     qword [rbx], rax
+	ret
+
+drop:
+	add     rbx, 8
 	ret
 
 swap:
