@@ -5,6 +5,9 @@ segment readable writeable
 dstack          rq      1024					;reserve 1024 qwords
 numstr          rb      16						;for converting numbers to strings
 numstrlen       equ     16
+argc            dq      ?
+argv            dq      ?
+envp            dq      ?
 
 segment readable executable
 ;; FLOW CONTROL

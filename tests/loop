@@ -1,0 +1,8 @@
+(4321)
+@test[int][int]
+    1 .add
+    .dup 4_321 .sub
+    &test @[int][int]; .if .jmp
+;
+
+1 .test .ipr

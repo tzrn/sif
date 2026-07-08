@@ -4,3 +4,6 @@
 !.gitignore
 !LICENSE
 !README.md
+!tests
+!tests/*
+!test.py

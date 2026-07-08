@@ -1,4 +1,6 @@
-with open("source.sif", "r") as f:
+import sys
+
+with open(sys.argv[1], "r") as f:
     source = f.read() + " "
 
 i = 0
@@ -24,20 +26,33 @@ def err(text):
     raise Exception(f"\033[31m{line}:{char} {text}\033[0m")
 
 
-def get_until(endings):
+def get_until(endings, escape=False):
     global c, line
     startline, startchar = line, char
     s = ""
     while True:
         if i >= l:
             err(
-                f"token that starts on line {startline}:{startchar} expects any of [{endings}] to follow it"
+                f"token that starts on line {startline}:{startchar} expects any of {endings} to follow it"
             )
         c = source[i]
         if c in endings:
             return s
+
         if c == "\n":
+            if escape:
+                s += '",10,"'
+                nextl()
+                continue
             line += 1
+        elif escape and c == "\\" and i < l:
+            nextc()
+            c = source[i]
+            if c == "n":
+                c = '",10,"'
+            elif c == '"':
+                c = '",34,"'
+
         s += c
         nextc()
 
@@ -63,7 +78,7 @@ funcstack = []
 typestack = []
 funcdefs = ""
 code = [""]
-sep = ["\n", " ", "\t", "("]
+sep = ["\n", " ", "\t", "(", ";"]
 
 
 def cmd(t):
@@ -98,22 +113,23 @@ def get_type(t):
     raise err(f"invalid type {t}")
 
 
-def read_signiture():
-    def read_func():
-        t = []
-        nextc()
-        while source[i] != "]":
-            t.append(read_signiture())
-            if source[i] == ",":
-                nextc()
-        nextc()
-        return t
+def read_type_list():
+    t = []
+    nextc()
+    while source[i] != "]":
+        t.append(read_type())
+        if source[i] == ",":
+            nextc()
+    nextc()
+    return t
 
+
+def read_type():
     if source[i] == "[":
-        param = read_func()
+        param = read_type_list()
         ret = []
         if source[i] == "[":
-            ret = read_func()
+            ret = read_type_list()
             for r in ret:
                 if isinstance(r, int) and not r in param:
                     err(f"you cannot use generic '{ret}' because it wasn't in inputs")
@@ -131,7 +147,7 @@ while i < l:
     match c:
         case '"':
             nextc()
-            s = get_until(['"'])
+            s = get_until(['"'], escape=True)
             nextc()
             n = len(data)
             push(f"d{n}", str)
@@ -152,7 +168,7 @@ while i < l:
             code.append("")
 
             f = get_until(["["])
-            typ = read_signiture()
+            typ = read_type()
             if f in cmds:
                 err(f"attempt to shadow {t}")
 
@@ -206,7 +222,7 @@ while i < l:
             n = len(typestack)
             if n < len(params):
                 err(
-                    f"function @{t} requires {typ[0]} but the stack is too short: {typestack}"
+                    f"function @{t} requires {params} but the stack is too short: {typestack}"
                 )
             if t == "jmp" or t == "go":
                 callee = typestack.pop()
@@ -249,7 +265,19 @@ while i < l:
                 err(f"unexpected token '{t}'")
 
 start = """start:
-lea rbx, [dstack+1000*8] ;load effective address, top of the data stack"""
+lea rbx, [dstack+1000*8] ;load effective address, top of the data stack
+
+mov rax, [rsp]
+mov [argc], rax
+
+add rax, 2 ; argc, NULL
+shl rax, 3
+add rax, rsp
+mov [envp], rax
+
+lea rax, [rsp+8]
+mov [argv], rax
+"""
 
 end = """;exit
 mov rax, 60 ;exit
