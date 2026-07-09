@@ -23,7 +23,7 @@ def nextl():
 
 
 def err(text):
-    raise Exception(f"\033[31m{line}:{char} {text}\033[0m")
+    raise Exception(f"\033[41m{line}:{char} {text}\033[0m")
 
 
 def get_until(endings, escape=False):
@@ -67,6 +67,7 @@ cmds = {
     "dup": ("dupl", ([1], [1, 1])),
     "swap": ("swap", ([1, 2], [2, 1])),
     "drop": ("drop", ([1], [])),
+    # "mem": ("mem", ([int], [mem])),
     # special logic in case "."
     "jmp": ("jump", ([1], [])),
     "go": ("go", ([1], [])),
@@ -76,6 +77,7 @@ nfunc = 0
 data = []
 funcstack = []
 typestack = []
+arenastack = []
 funcdefs = ""
 code = [""]
 sep = ["\n", " ", "\t", "(", ";"]
@@ -84,7 +86,7 @@ sep = ["\n", " ", "\t", "(", ";"]
 def cmd(t):
     if t in cmds:
         return cmds[t]
-    return t
+    err(f"undefined function {t}")
 
 
 def emit(s):
@@ -101,10 +103,18 @@ mov qword [rbx], {val}
     typestack.append(typ)
 
 
-types = {
-    "int": int,
-    "str": str,
-}
+class Arena:
+    def __init__(self):
+        self.childrefs = 0
+
+
+class Mem:
+    def __init__(self, typ):
+        self.typ = typ
+        self.refs = 0
+
+
+types = {"int": int, "str": str, "mem": Mem}
 
 
 def get_type(t):
@@ -134,12 +144,41 @@ def read_type():
                 if isinstance(r, int) and not r in param:
                     err(f"you cannot use generic '{ret}' because it wasn't in inputs")
         return (param, ret)
+    elif source[i] == "*":
+        nextc()
+        return Mem(read_type())
     else:
-        t = get_until([",", "]"])
+        t = get_until(sep + [",", "]"])
         try:
             return int(t)
         except ValueError:
             return get_type(t)
+
+
+def same_type_lists(a, b):
+    if len(a) != len(b):
+        return False
+    for i in range(len(a)):
+        if not same_types(a[i], b[i]):
+            return False
+    return True
+
+
+def same_types(a, b):
+    if isinstance(a, Mem):
+        while isinstance(a, Mem):
+            if not isinstance(b, Mem):
+                return False
+            a = a.type
+            b = b.type
+        return same_types(a, b)
+
+    if isinstance(a, tuple):
+        if not isinstance(b, tuple):
+            return False
+        return same_type_lists(a[0], b[0]) and same_type_lists(a[1], b[1])
+
+    return a == b
 
 
 while i < l:
@@ -163,21 +202,40 @@ while i < l:
         case "&":  # command adress
             nextc()
             push(*cmd(get_until(sep)))
+        case "*":
+            size = typestack.pop()
+            if not size == int:
+                err(f"invalid mem size {size}")
+            if len(arenastack) == 0:
+                err(f"memory allocation outside of an arena")
+
+            nextc()
+            typ = read_type()
+            mem = Mem(typ)
+            mem.refs = 1
+            arena = arenastack[len(arenastack) - 1]
+            arena.childrefs += 1
+
+            push(mem, Mem)
+        case "{":
+            nextc()
+            arenastack.append(Arena())
+        case "}":
+            nextc()
+            arenastack.pop()
         case "@":
             nextc()
-            code.append("")
 
             f = get_until(["["])
             typ = read_type()
             if f in cmds:
-                err(f"attempt to shadow {t}")
+                err(f"attempt to shadow @{f}")
 
             fname = f"f{nfunc}"
-            if f == "" or source[i] == "&":
-                if source[i] == "&":
-                    nextc()
+            if f == "":
                 push(fname, typ)
 
+            code.append("")
             funcstack.append((f, typ[1], len(typestack)))
             typestack += typ[0]
 
@@ -190,40 +248,20 @@ while i < l:
             emit("ret\n\n")
             funcdefs += code.pop()
             f, ret, frame_start = funcstack.pop()
-            retlen = len(ret)
 
-            n = len(typestack)
-            for val in ret:
-                n -= 1
-                if not typestack or val != typestack[n]:
-                    err(
-                        f"function @{f} must return {ret} but top of your stack is {typestack[-len(ret):]}"
-                    )
-
-            # print(len(typestack), frame_start, len(typestack) - frame_start, retlen)
-            typestack = typestack[: len(typestack) - retlen]
-            lendiff = len(typestack) - frame_start
-            if lendiff < 0:
-                err(
-                    f"function @{f} must return {ret} but you are {-lendiff} values short"
-                )
-            if lendiff > 0:
-                err(
-                    f"function @{f} must return {ret} but you return {lendiff} values too many {typestack}"
-                )
+            top = typestack[frame_start:]
+            if not same_type_lists(ret, top):
+                err(f"function @{f} must return {ret} but you're returning {top}")
+            typestack = typestack[:frame_start]
         case ".":
             nextc()
             t = get_until(sep)
             if not t in cmds:
-                err(f"undefined function {t}")
+                err(f"undefined function .{t}")
             f, (params, rets) = cmd(t)
-            # print(f"calling {t}, {typestack}")
 
             n = len(typestack)
-            if n < len(params):
-                err(
-                    f"function @{t} requires {params} but the stack is too short: {typestack}"
-                )
+            print(f"calling {t}, {typestack}, {n}>{len(params)}")
             if t == "jmp" or t == "go":
                 callee = typestack.pop()
                 n -= 1
@@ -231,19 +269,22 @@ while i < l:
                     err(f"{t} takes a function, but got {callee}")
                 params, rets = callee
 
+            if n < len(params):
+                err(f".{t} requires {params} but the stack is too short: {typestack}")
+
             generics = {}
             n -= len(params)
             for param in params:
                 if isinstance(param, int):
                     if param in generics and generics[param] != typestack[n]:
                         err(
-                            f"generic type '{param}' was given different types - {typestack[n]} and {generics[param]} when calling @{t}"
+                            f"generic type '{param}' was given different types - {typestack[n]} and {generics[param]} when calling .{t}"
                         )
                     else:
                         generics[param] = typestack[n]
-                elif param != typestack[n]:
+                elif not same_types(param, typestack[n]):
                     err(
-                        f"function @{t} requires {params} but the top of your stack is: {typestack[-len(params):]}"
+                        f".{t} requires {params} but the top of your stack is: {typestack[-len(params):]}"
                     )
                 n += 1
 

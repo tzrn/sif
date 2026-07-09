@@ -23,4 +23,5 @@ def test(f):
 directory = Path("tests")
 for f in directory.iterdir():
     if f.is_file():
-        print(str(f.name), "passed" if test(f) else "failed")
+        print(f"{str(f.name):20}", end=" ")
+        print("\033[42mpassed" if test(f) else "\033[41mfailed", "\033[0m", sep="")

@@ -1,0 +1,15 @@
+(15)
+@triple[int,[int][int]][int]
+    .go .dup .dup .add .add
+;
+
+@double[int,[int][int]][int]
+    .go .dup .add
+;
+
+@inc[int][int]
+    1 .add
+;
+
+(1 2      4     5      15)
+1 &inc .double &inc .triple .ipr
