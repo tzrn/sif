@@ -1,8 +1,14 @@
 format ELF64 executable 3
 entry start
 
+;rbx is the stack pointers
+;r12 is the current arena alloc stack's pointer
+STACK_SIZE = 1024
+ARENA_SIZE = 64
+
 segment readable writeable
-dstack          rq      1024					;reserve 1024 qwords
+dstack          rq      STACK_SIZE				;reserve 1024 qwords
+arena           rq      ARENA_SIZE				;stack of pointers to heap allocations
 numstr          rb      16						;for converting numbers to strings
 numstrlen       equ     16
 argc            dq      ?
@@ -134,7 +140,7 @@ print_int:
 	ret
 
 
-;; stack
+;; STACK
 dupl:
 	mov     qword rax, [rbx]
 	sub     rbx, 8
@@ -150,6 +156,65 @@ swap:
 	mov     rcx, [rbx+8]
 	mov     [rbx], rcx
 	mov     [rbx+8], rax
+	ret
+
+;; MEMORY
+alloc:
+	mov     rsi, [rbx]							;size (in pages)
+	imul    rsi, 4096
+	mov     [r12], rsi
+	sub     r12, 8
+	add     rbx, 8
+
+	mov     rax, 9								;mmap
+	xor     rdi, rdi							;addr 0 = any is fine
+	mov     rdx, 3								;PROT_READ|PROT_WRITE
+	mov     r10, 0x22							;MAP_PRIVATE|MAP_ANONYMOUS
+	mov     r8, -1
+	xor     r9, r9
+	syscall
+
+	test    rax, rax
+	js      exit								;jump if sign (<0)
+
+	mov     [r12], rax
+	mov     [rbx], rax
+	sub     r12, 8
+	ret
+
+free:
+	cmp     r12, arena+ARENA_SIZE
+	jz      .end
+
+	mov     rax, 11								;munmap
+	mov     rsi, [r12+16]						;length
+	mov     rdi, [r12+8]						;addr
+	syscall
+
+	add     r12, 16
+	jmp     free
+
+.end:
+	ret
+
+set:
+	mov     r8, [rbx+16]						;list
+	mov     r9, [rbx+8]							;index
+	mov     r10, [rbx]							;value
+	add     rbx, 24
+
+	add     r8, r9
+	mov     [r8], r10
+	ret
+
+get:
+	mov     r8, [rbx+8]							;list
+	mov     r9, [rbx]							;index
+	add     rbx, 8
+
+	add     r8, r9
+	mov     rax, [r8]
+	mov     [rbx], rax
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

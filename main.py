@@ -57,6 +57,38 @@ def get_until(endings, escape=False):
         nextc()
 
 
+class Arena:
+    pass
+
+
+class Mem:
+    def __init__(self, typ):
+        self.typ = typ
+
+
+class Frame:
+    def __init__(self, name, param, ret):
+        self.param = param
+        self.ret = ret
+        self.name = name
+
+        self.code = f""
+        self.typestack = []
+
+    def emit(self, s):
+        self.code += s
+
+    def push(self, val, typ):
+        self.emit(
+            f"""sub rbx, 8 ; push {typ} onto stack
+mov qword [rbx], {val}\n"""
+        )
+        self.typestack.append(typ)
+
+    def pop(self):
+        return self.typestack.pop()
+
+
 cmds = {
     "pr": ("print", ([str], [])),
     "if": ("if_", ([int, 1, 1], [1])),
@@ -67,7 +99,8 @@ cmds = {
     "dup": ("dupl", ([1], [1, 1])),
     "swap": ("swap", ([1, 2], [2, 1])),
     "drop": ("drop", ([1], [])),
-    # "mem": ("mem", ([int], [mem])),
+    "set": ("set", ([Mem(1), int, 1], [])),
+    "get": ("get", ([Mem(1), int], [1])),
     # special logic in case "."
     "jmp": ("jump", ([1], [])),
     "go": ("go", ([1], [])),
@@ -75,43 +108,17 @@ cmds = {
 
 nfunc = 0
 data = []
-funcstack = []
-typestack = []
-arenastack = []
-funcdefs = ""
-code = [""]
-sep = ["\n", " ", "\t", "(", ";"]
+arena = None
+sep = ["\n", " ", "\t", "(", ";", "."]
+code = []
+currframe = Frame("main", [], [])
+frames = [currframe]
 
 
 def cmd(t):
     if t in cmds:
         return cmds[t]
     err(f"undefined function {t}")
-
-
-def emit(s):
-    code[len(funcstack)] += s
-
-
-def push(val, typ):
-    emit(
-        f"""
-sub rbx, 8 ; push {typ} onto stack
-mov qword [rbx], {val}
-"""
-    )
-    typestack.append(typ)
-
-
-class Arena:
-    def __init__(self):
-        self.childrefs = 0
-
-
-class Mem:
-    def __init__(self, typ):
-        self.typ = typ
-        self.refs = 0
 
 
 types = {"int": int, "str": str, "mem": Mem}
@@ -155,28 +162,35 @@ def read_type():
             return get_type(t)
 
 
-def same_type_lists(a, b):
+def same_type_lists(a, b, generics={}):
     if len(a) != len(b):
         return False
     for i in range(len(a)):
-        if not same_types(a[i], b[i]):
+        if not same_types(a[i], b[i], generics):
             return False
     return True
 
 
-def same_types(a, b):
+def same_types(a, b, generics={}):
     if isinstance(a, Mem):
         while isinstance(a, Mem):
             if not isinstance(b, Mem):
                 return False
-            a = a.type
-            b = b.type
-        return same_types(a, b)
+            a = a.typ
+            b = b.typ
+        return same_types(a, b, generics)
 
     if isinstance(a, tuple):
         if not isinstance(b, tuple):
             return False
         return same_type_lists(a[0], b[0]) and same_type_lists(a[1], b[1])
+
+    if isinstance(a, int):  # b is from stack thus never generic
+        if a in generics:
+            a = generics[a]
+        else:
+            generics[a] = b
+            return True
 
     return a == b
 
@@ -189,7 +203,7 @@ while i < l:
             s = get_until(['"'], escape=True)
             nextc()
             n = len(data)
-            push(f"d{n}", str)
+            currframe.push(f"d{n}", str)
             data.append(s)
         case " " | "\t":
             nextc()
@@ -201,117 +215,120 @@ while i < l:
             nextc()
         case "&":  # command adress
             nextc()
-            push(*cmd(get_until(sep)))
+            currframe.push(*cmd(get_until(sep)))
         case "*":
-            size = typestack.pop()
+            nextc()
+            size = currframe.pop()
             if not size == int:
                 err(f"invalid mem size {size}")
-            if len(arenastack) == 0:
+            if arena == None:
                 err(f"memory allocation outside of an arena")
 
-            nextc()
             typ = read_type()
             mem = Mem(typ)
-            mem.refs = 1
-            arena = arenastack[len(arenastack) - 1]
-            arena.childrefs += 1
 
-            push(mem, Mem)
+            currframe.typestack.append(mem)
+            currframe.emit("call alloc\n")
         case "{":
             nextc()
-            arenastack.append(Arena())
+            if arena is not None:
+                err("nested arenas aren't allowed")
+            arena = Arena()
         case "}":
             nextc()
-            arenastack.pop()
+            arena = None
+            currframe.emit("call free\n")
         case "@":
             nextc()
 
             f = get_until(["["])
-            typ = read_type()
+            param, ret = read_type()
             if f in cmds:
                 err(f"attempt to shadow @{f}")
 
             fname = f"f{nfunc}"
-            if f == "":
-                push(fname, typ)
-
-            code.append("")
-            funcstack.append((f, typ[1], len(typestack)))
-            typestack += typ[0]
-
-            emit(f"{fname}:\n")
-            if f != "":  # otherwise lambda
-                cmds[f] = (fname, typ)
             nfunc += 1
+            if f == "":  # lambda
+                currframe.push(fname, (param, ret))
+            else:
+                cmds[f] = (fname, (param, ret))
+
+            currframe = Frame(f, param, ret)
+            frames.append(currframe)
+            currframe.typestack += param
+
+            currframe.emit(f"{fname}:\n")
         case ";":
             nextc()
-            emit("ret\n\n")
-            funcdefs += code.pop()
-            f, ret, frame_start = funcstack.pop()
+            currframe.emit("ret\n\n")
 
-            top = typestack[frame_start:]
-            if not same_type_lists(ret, top):
-                err(f"function @{f} must return {ret} but you're returning {top}")
-            typestack = typestack[:frame_start]
+            byeframe = frames.pop()
+            code.append(byeframe.code)
+            currframe = frames[len(frames) - 1]
+
+            if not same_type_lists(byeframe.typestack, byeframe.ret):
+                err(
+                    f"function @{byeframe.name} must return {byeframe.ret} but you're returning {byeframe.typestack}"
+                )
         case ".":
             nextc()
             t = get_until(sep)
             if not t in cmds:
                 err(f"undefined function .{t}")
             f, (params, rets) = cmd(t)
+            # print(f"calling {t}, {currframe.typestack}")
 
-            n = len(typestack)
-            print(f"calling {t}, {typestack}, {n}>{len(params)}")
             if t == "jmp" or t == "go":
-                callee = typestack.pop()
-                n -= 1
+                callee = currframe.pop()
                 if not isinstance(callee, tuple):
                     err(f"{t} takes a function, but got {callee}")
                 params, rets = callee
 
-            if n < len(params):
-                err(f".{t} requires {params} but the stack is too short: {typestack}")
+            stacklen = len(currframe.typestack)
+            paramlen = len(params)
+            if stacklen < paramlen:
+                err(
+                    f".{t} requires {params} but the stack is too short: {currframe.typestack}"
+                )
 
             generics = {}
-            n -= len(params)
-            for param in params:
-                if isinstance(param, int):
-                    if param in generics and generics[param] != typestack[n]:
-                        err(
-                            f"generic type '{param}' was given different types - {typestack[n]} and {generics[param]} when calling .{t}"
-                        )
-                    else:
-                        generics[param] = typestack[n]
-                elif not same_types(param, typestack[n]):
-                    err(
-                        f".{t} requires {params} but the top of your stack is: {typestack[-len(params):]}"
-                    )
-                n += 1
+            if not same_type_lists(
+                params, currframe.typestack[stacklen - paramlen :], generics
+            ):
+                err(
+                    f".{t} requires {params} but the top of your stack is: {currframe.typestack[-len(params):]}"
+                )
 
-            typestack = typestack[: len(typestack) - len(params)]
+            currframe.typestack = currframe.typestack[
+                : len(currframe.typestack) - len(params)
+            ]
             for ret in rets:
                 if isinstance(ret, int):
-                    typestack.append(generics[ret])
+                    currframe.typestack.append(generics[ret])
                 else:
-                    typestack.append(ret)
-            emit(f"call {f}\n")
+                    currframe.typestack.append(ret)
+            currframe.emit(f"call {f}\n")
         case _:
             t = get_until(sep)
             try:
                 t = int(t)
-                emit(f"mov rax, [d{len(data)}]")
-                push("rax", int)
+                currframe.emit(f"mov rax, [d{len(data)}]\n")
+                currframe.push("rax", int)
                 data.append(t)
             except ValueError:
                 err(f"unexpected token '{t}'")
 
+main = frames.pop().code
+funcdefs = "\n".join(code)
+
 start = """start:
-lea rbx, [dstack+1000*8] ;load effective address, top of the data stack
+lea rbx, [dstack+STACK_SIZE] ;load effective address, top of the data stack
+mov r12, arena+ARENA_SIZE ;arena stack ptr
 
 mov rax, [rsp]
 mov [argc], rax
 
-add rax, 2 ; argc, NULL
+add rax, 2 ; skip argc, NULL
 shl rax, 3
 add rax, rsp
 mov [envp], rax
@@ -320,7 +337,7 @@ lea rax, [rsp+8]
 mov [argv], rax
 """
 
-end = """;exit
+end = """exit:
 mov rax, 60 ;exit
 xor rdi, rdi ;exit code
 syscall
@@ -330,9 +347,9 @@ dat = "segment readable\n"
 for i in range(len(data)):
     t = data[i]
     if isinstance(data[i], str):
-        dat += f'd{i} db "{t}", 10, 0\n'
+        dat += f'd{i} db "{t}", 0\n'
     elif isinstance(data[i], int):
         dat += f"d{i} dq {t}\n"
 
 with open("init.asm", "r") as init:
-    print(init.read(), funcdefs, start, code[0], end, dat, sep="\n", end="")
+    print(init.read(), funcdefs, start, main, end, dat, sep="\n", end="")
