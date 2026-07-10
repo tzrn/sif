@@ -1,0 +1,29 @@
+(120)
+@mul[int,int,int][int]
+    (result, a, b)
+    <0 <>3 <>1 .add
+    (b, a, r+b)
+    <>2 <>1 1 .sub
+    <0
+
+    @[int,int,int][int]
+        <>1
+        &mul .jmp
+    ;
+    @[int,int,int][int]
+        .drop .drop
+    ; .if .go
+;
+
+@fact[int][int]
+    <0 1 .sub
+    @[int][int]
+        (x, x-1)
+        <0 1 .sub .fact
+        0 <>2 .mul
+    ;
+    @[int][int]
+    ; .if .go
+;
+
+5 .fact .ipr

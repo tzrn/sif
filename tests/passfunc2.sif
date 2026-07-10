@@ -1,10 +1,10 @@
 (15)
 @triple[int,[int][int]][int]
-    .go .dup .dup .add .add
+    .go <0 <0 .add .add
 ;
 
 @double[int,[int][int]][int]
-    .go .dup .add
+    .go <0 .add
 ;
 
 @inc[int][int]

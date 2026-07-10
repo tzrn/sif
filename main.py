@@ -96,8 +96,6 @@ cmds = {
     "sub": ("subtract", ([int, int], [int])),
     "add": ("sum", ([int, int], [int])),
     "ipr": ("print_int", ([int], [])),
-    "dup": ("dupl", ([1], [1, 1])),
-    "swap": ("swap", ([1, 2], [2, 1])),
     "drop": ("drop", ([1], [])),
     "set": ("set", ([Mem(1), int, 1], [])),
     "get": ("get", ([Mem(1), int], [1])),
@@ -270,6 +268,34 @@ while i < l:
                 err(
                     f"function @{byeframe.name} must return {byeframe.ret} but you're returning {byeframe.typestack}"
                 )
+        case "<":
+            nextc()
+            swap = source[i] == ">"
+            if swap:
+                nextc()
+            index = get_until(sep)
+
+            try:
+                index = int(index)
+            except ValueError:
+                err(f"invalid index {index}")
+
+            if index >= len(currframe.typestack):
+                err(
+                    f"index {index} is referencing a value beyond the stack {currframe.typestack}"
+                )
+
+            currframe.emit(f"mov rdi, {index*8}\n")
+            n = len(currframe.typestack) - 1
+            index = n - index
+            if swap:
+                a = currframe.typestack[index]
+                currframe.typestack[index] = currframe.typestack[n - 1]
+                currframe.typestack[n - 1] = a
+                currframe.emit("call swap\n")
+            else:  # copy
+                currframe.typestack.append(currframe.typestack[index])
+                currframe.emit("call copy\n")
         case ".":
             nextc()
             t = get_until(sep)

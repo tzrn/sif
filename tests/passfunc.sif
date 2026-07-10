@@ -1,6 +1,6 @@
 (1010)
 @test[[][int]][int,int]
-    .go .dup
+    .go <0
 ;
 
-@[][int] 5 .dup .add; .test .ipr .ipr
+@[][int] 5 <0 .add; .test .ipr .ipr

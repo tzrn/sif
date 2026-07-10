@@ -91,7 +91,8 @@ strlen:
 	ret
 
 print:
-	call    dupl
+	mov     rdi, 0
+	call    copy
 	call    strlen
 	mov     rdx, rax							;string len
 	mov     rax, 1								;sys_write
@@ -141,21 +142,25 @@ print_int:
 
 
 ;; STACK
-dupl:
-	mov     qword rax, [rbx]
-	sub     rbx, 8
-	mov     qword [rbx], rax
-	ret
-
 drop:
 	add     rbx, 8
 	ret
 
 swap:
-	mov     rax, [rbx]
-	mov     rcx, [rbx+8]
-	mov     [rbx], rcx
-	mov     [rbx+8], rax
+	add     rdi, rbx
+
+	mov     rdx, [rdi]
+	mov     r8, [rbx]
+
+	mov     [rbx], rdx
+	mov     [rdi], r8
+	ret
+
+copy:
+	add     rdi, rbx
+	mov     rax, [rdi]
+	sub     rbx, 8
+	mov     [rbx], rax
 	ret
 
 ;; MEMORY
