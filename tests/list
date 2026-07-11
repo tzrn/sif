@@ -1,0 +1,18 @@
+(59123)
+{
+    1 **int
+    1 *int
+
+    0 5 .set
+    1 9 .set
+    511 123 .set
+
+    0 <>1 .set
+
+    0 .get
+    0 .get .ipr
+    1 .get .ipr
+    511 .get .ipr
+
+    .drop .drop
+}

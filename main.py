@@ -67,7 +67,7 @@ class Mem:
 
 
 class Frame:
-    def __init__(self, name, param, ret):
+    def __init__(self, name, param, ret, cmds={}):
         self.param = param
         self.ret = ret
         self.name = name
@@ -92,13 +92,12 @@ mov qword [rbx], {val}\n"""
 cmds = {
     "pr": ("print", ([str], [])),
     "if": ("if_", ([int, 1, 1], [1])),
-    "nop": ("np", ([], [])),
     "sub": ("subtract", ([int, int], [int])),
     "add": ("sum", ([int, int], [int])),
     "ipr": ("print_int", ([int], [])),
     "drop": ("drop", ([1], [])),
-    "set": ("set", ([Mem(1), int, 1], [])),
-    "get": ("get", ([Mem(1), int], [1])),
+    "set": ("set", ([Mem(1), int, 1], [Mem(1)])),
+    "get": ("get", ([Mem(1), int], [Mem(1), 1])),
     # special logic in case "."
     "jmp": ("jump", ([1], [])),
     "go": ("go", ([1], [])),
@@ -109,7 +108,7 @@ data = []
 arena = None
 sep = ["\n", " ", "\t", "(", ";", "."]
 code = []
-currframe = Frame("main", [], [])
+currframe = Frame("main", [], [], cmds)
 frames = [currframe]
 
 
@@ -186,11 +185,36 @@ def same_types(a, b, generics={}):
     if isinstance(a, int):  # b is from stack thus never generic
         if a in generics:
             a = generics[a]
+            return same_types(a, b)
         else:
             generics[a] = b
             return True
 
     return a == b
+
+
+def replace_generics_list(arr, generics):
+    new = []
+    for i in range(len(arr)):
+        new.append(replace_generics(arr[i], generics))
+    return new
+
+
+def replace_generics(a, generics):
+    if isinstance(a, int):
+        if a in generics:
+            return generics[a]
+        else:
+            err(f"generic type {a} was not defined")
+    if isinstance(a, Mem):
+        return Mem(replace_generics(a.typ, generics))
+    if isinstance(a, tuple):
+        param, ret = a
+        return (
+            replace_generics_list(param, generics),
+            replace_generics_list(ret, generics),
+        )
+    return a
 
 
 while i < l:
@@ -216,6 +240,8 @@ while i < l:
             currframe.push(*cmd(get_until(sep)))
         case "*":
             nextc()
+            if len(currframe.typestack) < 1:
+                err("need a mem size but the stack is empty")
             size = currframe.pop()
             if not size == int:
                 err(f"invalid mem size {size}")
@@ -230,10 +256,15 @@ while i < l:
         case "{":
             nextc()
             if arena is not None:
+                # because it's hard to check if you hide
+                # a memory in another arena's memory
                 err("nested arenas aren't allowed")
             arena = Arena()
         case "}":
             nextc()
+            for t in currframe.typestack:
+                if isinstance(t, Mem):
+                    err(f"memory is on the stack beyond an arena {currframe.typestack}")
             arena = None
             currframe.emit("call free\n")
         case "@":
@@ -290,8 +321,8 @@ while i < l:
             index = n - index
             if swap:
                 a = currframe.typestack[index]
-                currframe.typestack[index] = currframe.typestack[n - 1]
-                currframe.typestack[n - 1] = a
+                currframe.typestack[index] = currframe.typestack[n]
+                currframe.typestack[n] = a
                 currframe.emit("call swap\n")
             else:  # copy
                 currframe.typestack.append(currframe.typestack[index])
@@ -328,11 +359,7 @@ while i < l:
             currframe.typestack = currframe.typestack[
                 : len(currframe.typestack) - len(params)
             ]
-            for ret in rets:
-                if isinstance(ret, int):
-                    currframe.typestack.append(generics[ret])
-                else:
-                    currframe.typestack.append(ret)
+            currframe.typestack += replace_generics_list(rets, generics)
             currframe.emit(f"call {f}\n")
         case _:
             t = get_until(sep)
@@ -363,12 +390,6 @@ lea rax, [rsp+8]
 mov [argv], rax
 """
 
-end = """exit:
-mov rax, 60 ;exit
-xor rdi, rdi ;exit code
-syscall
-"""
-
 dat = "segment readable\n"
 for i in range(len(data)):
     t = data[i]
@@ -378,4 +399,4 @@ for i in range(len(data)):
         dat += f"d{i} dq {t}\n"
 
 with open("init.asm", "r") as init:
-    print(init.read(), funcdefs, start, main, end, dat, sep="\n", end="")
+    print(init.read(), funcdefs, start, main, "jmp exit", dat, sep="\n", end="")

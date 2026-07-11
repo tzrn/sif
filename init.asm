@@ -57,9 +57,6 @@ jump:
 	jmp     rax
 	ret
 
-np:
-	ret
-
 ;; ARITHMETIC
 sum:
 	mov     rax, [rbx]
@@ -169,7 +166,6 @@ alloc:
 	imul    rsi, 4096
 	mov     [r12], rsi
 	sub     r12, 8
-	add     rbx, 8
 
 	mov     rax, 9								;mmap
 	xor     rdi, rdi							;addr 0 = any is fine
@@ -205,8 +201,9 @@ free:
 set:
 	mov     r8, [rbx+16]						;list
 	mov     r9, [rbx+8]							;index
+	imul    r9, 8
 	mov     r10, [rbx]							;value
-	add     rbx, 24
+	add     rbx, 16
 
 	add     r8, r9
 	mov     [r8], r10
@@ -215,12 +212,17 @@ set:
 get:
 	mov     r8, [rbx+8]							;list
 	mov     r9, [rbx]							;index
-	add     rbx, 8
+	imul    r9, 8
 
 	add     r8, r9
 	mov     rax, [r8]
 	mov     [rbx], rax
 	ret
+
+exit:
+	mov     rax, 60								;exit
+	xor     rdi, rdi							;exit code
+	syscall
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

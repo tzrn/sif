@@ -25,7 +25,7 @@ def test(f):
     result = sp.run(["/tmp/out"], capture_output=True)
     out = result.stdout.decode("utf-8").replace("\x00", "")
     # print(f"{repr(expected)} {repr(out)}")
-    return len(out) >= len(expected) and out[: len(expected)] == expected
+    return out == expected
 
 
 directory = Path("tests")
