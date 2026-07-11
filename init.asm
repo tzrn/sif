@@ -1,12 +1,13 @@
 format ELF64
-public _start
+public main
 
-;rbx is the stack pointers
-;r12 is the current arena alloc stack's pointer
+;r10 is the stack pointers
+;r11 is the current arena alloc stack's pointer
 STACK_SIZE = 1024
 ARENA_SIZE = 64
 
-section '.bss' writeable
+section '.note.GNU-stack'
+section '.bss'
 dstack          rq      STACK_SIZE				;reserve 1024 qwords
 arena           rq      ARENA_SIZE				;stack of pointers to heap allocations
 numstr          rb      16						;for converting numbers to strings
@@ -15,68 +16,68 @@ argc            dq      ?
 argv            dq      ?
 envp            dq      ?
 
-section '.text' executable
+section '.text'
 ;; FLOW CONTROL
 if_:
-	add     rbx, 8
+	add     r10, 8
 ; cond [v1] v2
-	cmp     qword [rbx+8], 0
+	cmp     qword [r10+8], 0
 	jnz     .true
 
 ;false
-	mov     rax, [rbx-8]
+	mov     rax, [r10-8]
 	jmp     .endif
 
 .true:
-	mov     rax, [rbx]
+	mov     rax, [r10]
 
 .endif:
-	add     rbx, 8
-	mov     [rbx], rax
+	add     r10, 8
+	mov     [r10], rax
 	ret
 
 false:
-	sub     rbx, 8
-	mov     qword [rbx], 0
+	sub     r10, 8
+	mov     qword [r10], 0
 	ret
 
 true:
-	sub     rbx, 8
-	mov     qword [rbx], 1
+	sub     r10, 8
+	mov     qword [r10], 1
 	ret
 
 go:
-	mov     rax, [rbx]
-	add     rbx, 8
+	mov     rax, [r10]
+	add     r10, 8
 	call    rax
 	ret
 
 jump:
-	mov     rax, [rbx]
-	add     rbx, 8
+	mov     rax, [r10]
+	add     r10, 8
+	add     rsp, 16
 	jmp     rax
-	ret
 
 ;; ARITHMETIC
 sum:
-	mov     rax, [rbx]
-	add     rbx, 8
-	add     rax, [rbx]
-	mov     [rbx], rax
+	mov     rax, [r10]
+	add     r10, 8
+	add     rax, [r10]
+	mov     [r10], rax
 	ret
 
 subtract:
-	add     rbx, 8
-	mov     rax, [rbx]
-	sub     rax, [rbx-8]
-	mov     [rbx], rax
+	add     r10, 8
+	mov     rax, [r10]
+	sub     rax, [r10-8]
+	mov     [r10], rax
 	ret
 
 ;; IO
 strlen:
-	mov     rdx, [rbx]							;start
+	mov     rdx, [r10]							;start
 	mov     rax, rdx							;ptr
-	add     rbx, 8
+	add     r10, 8
 .start:
 	cmp     byte [rax], 0
 	jz      .endl
@@ -94,9 +95,13 @@ print:
 	mov     rdx, rax							;string len
 	mov     rax, 1								;sys_write
 	mov     rdi, 1								;stdout
-	mov     rsi, [rbx]							;string
-	add     rbx, 8								;pop
+	mov     rsi, [r10]							;string
+	add     r10, 8								;pop
+	push    r11
+	push    r10
 	syscall
+	pop     r10
+	pop     r11
 	ret
 
 print_int:
@@ -104,8 +109,8 @@ print_int:
 	add     rdi, numstrlen
 	mov     byte [rdi], 0
 
-	mov     rax, [rbx]							;number
-	add     rbx, 8								;pop
+	mov     rax, [r10]							;number
+	add     r10, 8								;pop
 	mov     rcx, 10
 
 	xor     r8, r8
@@ -131,8 +136,8 @@ print_int:
 	mov     byte [rdi], '-'
 
 .end:
-	sub     rbx, 8
-	mov     qword [rbx], rdi
+	sub     r10, 8
+	mov     qword [r10], rdi
 	call    print
 
 	ret
@@ -140,83 +145,91 @@ print_int:
 
 ;; STACK
 drop:
-	add     rbx, 8
+	add     r10, 8
 	ret
 
 swap:
-	add     rdi, rbx
+	add     rdi, r10
 
 	mov     rdx, [rdi]
-	mov     r8, [rbx]
+	mov     r8, [r10]
 
-	mov     [rbx], rdx
+	mov     [r10], rdx
 	mov     [rdi], r8
 	ret
 
 copy:
-	add     rdi, rbx
+	add     rdi, r10
 	mov     rax, [rdi]
-	sub     rbx, 8
-	mov     [rbx], rax
+	sub     r10, 8
+	mov     [r10], rax
 	ret
 
 ;; MEMORY
 alloc:
-	mov     rsi, [rbx]							;size (in pages)
+	mov     rsi, [r10]							;size (in pages)
 	imul    rsi, 4096
-	mov     [r12], rsi
-	sub     r12, 8
+	mov     [r11], rsi
+	sub     r11, 8
 
+	push    r10
 	mov     rax, 9								;mmap
 	xor     rdi, rdi							;addr 0 = any is fine
 	mov     rdx, 3								;PROT_READ|PROT_WRITE
 	mov     r10, 0x22							;MAP_PRIVATE|MAP_ANONYMOUS
 	mov     r8, -1
 	xor     r9, r9
+	push    r11
 	syscall
+	pop     r11
+	pop     r10
 
 	test    rax, rax
 	js      exit								;jump if sign (<0)
 
-	mov     [r12], rax
-	mov     [rbx], rax
-	sub     r12, 8
+	mov     [r11], rax
+	mov     [r10], rax
+	sub     r11, 8
 	ret
 
 free:
-	cmp     r12, arena+ARENA_SIZE
+	cmp     r11, arena+ARENA_SIZE
 	jz      .end
 
 	mov     rax, 11								;munmap
-	mov     rsi, [r12+16]						;length
-	mov     rdi, [r12+8]						;addr
+	mov     rsi, [r11+16]						;length
+	mov     rdi, [r11+8]						;addr
+	push    r11
+	push    r10
 	syscall
+	pop     r10
+	pop     r11
 
-	add     r12, 16
+	add     r11, 16
 	jmp     free
 
 .end:
 	ret
 
 set:
-	mov     r8, [rbx+16]						;list
-	mov     r9, [rbx+8]							;index
+	mov     r8, [r10+16]						;list
+	mov     r9, [r10+8]							;index
 	imul    r9, 8
-	mov     r10, [rbx]							;value
-	add     rbx, 16
+	mov     rcx, [r10]							;value
+	add     r10, 16
 
 	add     r8, r9
-	mov     [r8], r10
+	mov     [r8], rcx
 	ret
 
 get:
-	mov     r8, [rbx+8]							;list
-	mov     r9, [rbx]							;index
+	mov     r8, [r10+8]							;list
+	mov     r9, [r10]							;index
 	imul    r9, 8
 
 	add     r8, r9
 	mov     rax, [r8]
-	mov     [rbx], rax
+	mov     [r10], rax
 	ret
 
 exit:

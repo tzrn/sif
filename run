@@ -3,5 +3,5 @@ name=$(basename ${1%.*})
 libs=$(find lib -name *.a)
 python3 main.py $1 > output/$name.asm &&
 fasm output/$name.asm output/$name.o > /dev/null &&
-ld -o output/$name output/$name.o $libs -static &&
+gcc -no-pie -o output/$name output/$name.o -I./include -L./lib -lraylib -lGL -lm -lpthread -ldl -lrt -lX11 &&
 output/$name

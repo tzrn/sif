@@ -80,8 +80,8 @@ class Frame:
 
     def push(self, val, typ):
         self.emit(
-            f"""sub rbx, 8 ; push {typ} onto stack
-mov qword [rbx], {val}\n"""
+            f"""sub r10, 8 ; push {typ} onto stack
+mov qword [r10], {val}\n"""
         )
         self.typestack.append(typ)
 
@@ -107,6 +107,8 @@ nfunc = 0
 data = []
 arena = None
 sep = ["\n", " ", "\t", "(", ";", "."]
+argregs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"]
+extern = ""
 code = []
 currframe = Frame("main", [], [], cmds)
 frames = [currframe]
@@ -217,6 +219,16 @@ def replace_generics(a, generics):
     return a
 
 
+def scan_functype():
+    if source[i] == "[":
+        return read_type()
+    elif source[i] == ":":
+        nextc()
+        t = get_until(sep)
+        _, (param, ret) = cmd(t)
+        return (param, ret)
+
+
 while i < l:
     c = source[i]
     match c:
@@ -270,8 +282,8 @@ while i < l:
         case "@":
             nextc()
 
-            f = get_until(["["])
-            param, ret = read_type()
+            f = get_until(["[", ":"])
+            param, ret = scan_functype()
             if f in cmds:
                 err(f"attempt to shadow @{f}")
 
@@ -286,10 +298,30 @@ while i < l:
             frames.append(currframe)
             currframe.typestack += param
 
-            currframe.emit(f"{fname}:\n")
+            currframe.emit(f"{fname}:;{f}\n push rbp\nmov rbp,rsp\n")
+        case "!":
+            nextc()
+            f = get_until(["[", ":"])
+            param, ret = scan_functype()
+            if f in cmds:
+                err(f"attempt to shadow @{f}")
+            if len(ret) > 1:
+                err("external function cannot return multiple values")
+
+            fname = f"f{nfunc}"
+            cmds[f] = (fname, (param, ret))
+            nfunc += 1
+
+            extern += f"extrn {f}\n{fname}:\n"
+            for j in range(len(param)):
+                extern += f"mov {argregs[j]}, [r10]\nadd r10,8\n"
+            extern += f"push r10\npush r11\ncall {f}\npop r11\npop r10\n"
+            if len(ret) == 1:
+                extern += f"sub r10,8\nmov [r10],rax\n"
+            extern += "ret\n\n"
         case ";":
             nextc()
-            currframe.emit("ret\n\n")
+            currframe.emit("leave\nret\n\n")
 
             byeframe = frames.pop()
             code.append(byeframe.code)
@@ -360,7 +392,7 @@ while i < l:
                 : len(currframe.typestack) - len(params)
             ]
             currframe.typestack += replace_generics_list(rets, generics)
-            currframe.emit(f"call {f}\n")
+            currframe.emit(f"call {f} ;{t}\n")
         case _:
             t = get_until(sep)
             try:
@@ -374,9 +406,9 @@ while i < l:
 main = frames.pop().code
 funcdefs = "\n".join(code)
 
-start = """_start:
-lea rbx, [dstack+STACK_SIZE] ;load effective address, top of the data stack
-mov r12, arena+ARENA_SIZE ;arena stack ptr
+start = """main:
+lea r10, [dstack+STACK_SIZE] ;load effective address, top of the data stack
+mov r11, arena+ARENA_SIZE ;arena stack ptr
 
 mov rax, [rsp]
 mov [argc], rax
@@ -399,4 +431,4 @@ for i in range(len(data)):
         dat += f"d{i} dq {t}\n"
 
 with open("init.asm", "r") as init:
-    print(init.read(), funcdefs, start, main, "jmp exit", dat, sep="\n", end="")
+    print(init.read(), extern, funcdefs, start, main, "jmp exit", dat, sep="\n", end="")

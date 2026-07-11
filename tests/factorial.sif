@@ -6,24 +6,24 @@
     <>2 <>1 1 .sub
     <0
 
-    @[int,int,int][int]
+    @:mul
         <>1
         &mul .jmp
     ;
-    @[int,int,int][int]
+    @:mul
         .drop .drop
     ; .if .go
 ;
 
 @fact[int][int]
     <0 1 .sub
-    @[int][int]
+    @:fact
         (x, x-1)
         <0 1 .sub .fact
         0 <>2 .mul
     ;
-    @[int][int]
+    @:fact
     ; .if .go
 ;
 
-5 .fact .ipr
+5 .fact .ipr "\n"
