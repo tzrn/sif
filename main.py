@@ -374,7 +374,7 @@ while i < l:
 main = frames.pop().code
 funcdefs = "\n".join(code)
 
-start = """start:
+start = """_start:
 lea rbx, [dstack+STACK_SIZE] ;load effective address, top of the data stack
 mov r12, arena+ARENA_SIZE ;arena stack ptr
 
@@ -390,7 +390,7 @@ lea rax, [rsp+8]
 mov [argv], rax
 """
 
-dat = "segment readable\n"
+dat = "section '.data'\n"
 for i in range(len(data)):
     t = data[i]
     if isinstance(data[i], str):

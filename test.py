@@ -10,21 +10,13 @@ sp.run(["chmod", "+x", tmp])
 
 
 def test(f):
-    result = sp.run(["python3", "main.py", f], capture_output=True)
+    result = sp.run(["./run", f], capture_output=True)
+    if result.returncode != 0:
+        return False
     with open(f, "r") as file:
         expected = str(eval(file.readline()[1:-2]))
-    if result.stderr:
-        return False
 
-    with open("/tmp/test.sif", "w") as file:
-        file.write(result.stdout.decode("utf-8"))
-    result = sp.run(["fasm", "/tmp/test.sif", tmp], capture_output=True)
-    if result.stderr:
-        return False
-
-    result = sp.run(["/tmp/out"], capture_output=True)
     out = result.stdout.decode("utf-8").replace("\x00", "")
-    # print(f"{repr(expected)} {repr(out)}")
     return out == expected
 
 

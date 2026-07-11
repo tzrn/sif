@@ -1,12 +1,12 @@
-format ELF64 executable 3
-entry start
+format ELF64
+public _start
 
 ;rbx is the stack pointers
 ;r12 is the current arena alloc stack's pointer
 STACK_SIZE = 1024
 ARENA_SIZE = 64
 
-segment readable writeable
+section '.bss' writeable
 dstack          rq      STACK_SIZE				;reserve 1024 qwords
 arena           rq      ARENA_SIZE				;stack of pointers to heap allocations
 numstr          rb      16						;for converting numbers to strings
@@ -15,7 +15,7 @@ argc            dq      ?
 argv            dq      ?
 envp            dq      ?
 
-segment readable executable
+section '.text' executable
 ;; FLOW CONTROL
 if_:
 	add     rbx, 8
