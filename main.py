@@ -98,8 +98,10 @@ cmds = {
     "drop": ("drop", ([1], [])),
     "set": ("set", ([Mem(1), int, 1], [Mem(1)])),
     "get": ("get", ([Mem(1), int], [Mem(1), 1])),
+    "np": ("np", ([], [])),
     # special logic in case "."
-    "jmp": ("jump", ([1], [])),
+    "ret": ("return", ([], [])),
+    "loop": ("_loop", ([], [])),
     "go": ("go", ([1], [])),
 }
 
@@ -294,11 +296,11 @@ while i < l:
             else:
                 cmds[f] = (fname, (param, ret))
 
-            currframe = Frame(f, param, ret)
+            currframe = Frame(fname, param, ret)
             frames.append(currframe)
             currframe.typestack += param
 
-            currframe.emit(f"{fname}:;{f}\n push rbp\nmov rbp,rsp\n")
+            currframe.emit(f"{fname}:;{f}\nmov rax, {fname}\npush rax\n")
         case "!":
             nextc()
             f = get_until(["[", ":"])
@@ -321,7 +323,7 @@ while i < l:
             extern += "ret\n\n"
         case ";":
             nextc()
-            currframe.emit("leave\nret\n\n")
+            currframe.emit("add rsp, 8\nret\n\n")
 
             byeframe = frames.pop()
             code.append(byeframe.code)
@@ -364,10 +366,18 @@ while i < l:
             t = get_until(sep)
             if not t in cmds:
                 err(f"undefined function .{t}")
-            f, (params, rets) = cmd(t)
             # print(f"calling {t}, {currframe.typestack}")
+            f, (params, rets) = cmd(t)
 
-            if t == "jmp" or t == "go":
+            if t == "ret":
+                if not same_type_lists(currframe.typestack, currframe.ret):
+                    err(
+                        f"returning {currframe.typestack} but {currframe.ret} is required"
+                    )
+            elif t == "loop":
+                params = currframe.param
+                rets = currframe.ret
+            elif t == "go":
                 callee = currframe.pop()
                 if not isinstance(callee, tuple):
                     err(f"{t} takes a function, but got {callee}")

@@ -2,7 +2,7 @@
 @test[int][int]
     1 .add
     <0 4_321 .sub
-    &test @[int][int]; .if .jmp
+    &loop &ret .if .go
 ;
 
 1 .test .ipr

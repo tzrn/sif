@@ -22,14 +22,14 @@ if_:
 	add     r10, 8
 ; cond [v1] v2
 	cmp     qword [r10+8], 0
-	jnz     .true
+	jnz     .false
 
-;false
-	mov     rax, [r10-8]
+;.true:
+	mov     rax, [r10]
 	jmp     .endif
 
-.true:
-	mov     rax, [r10]
+.false:
+	mov     rax, [r10-8]
 
 .endif:
 	add     r10, 8
@@ -52,11 +52,18 @@ go:
 	call    rax
 	ret
 
-jump:
-	mov     rax, [r10]
-	add     r10, 8
-	add     rsp, 16
+return:
+	add     rsp, 16								;discard return addr
+	pop     rax									;caller's return addr
 	jmp     rax
+
+_loop:
+	add     rsp, 8
+	pop     rax
+	jmp     rax
+
+np:
+	ret
 
 ;; ARITHMETIC
 sum:
