@@ -115,8 +115,9 @@ cmds = {
 nfunc = 0
 data = []
 arena = None
-sep = ["\n", " ", "\t", "(", ";", "."]
+sep = ["\n", " ", "\t", "(", ";"]
 argregs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"]
+floatargregs = ["xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7"]
 extern = ""
 code = []
 currframe = Frame("main", [], [], cmds)
@@ -129,7 +130,7 @@ def cmd(t):
     err(f"undefined function {t}")
 
 
-types = {"int": int, "str": str, "mem": Mem}
+types = {"int": int, "str": str, "float": float, "mem": Mem}
 
 
 def get_type(t):
@@ -324,8 +325,19 @@ while i < l:
             nfunc += 1
 
             extern += f"extrn {f}\n{fname}:\n"
+            ii = 0
+            fi = 0
+            extern += f"add r10,{len(param)*8}\n"
+            offset = 8
             for j in range(len(param)):
-                extern += f"mov {argregs[j]}, [r10]\nadd r10,8\n"
+                if param[j] == float:
+                    extern += f"movss {floatargregs[fi]}, [r10-{offset}]\n"
+                    fi += 1
+                else:
+                    extern += f"mov {argregs[ii]}, [r10-{offset}]\n"
+                    ii += 1
+                offset += 8
+
             extern += f"push r10\npush r11\ncall {f}\npop r11\npop r10\n"
             if len(ret) == 1:
                 extern += f"sub r10,8\nmov [r10],rax\n"
@@ -446,6 +458,28 @@ while i < l:
                     + f"true: {cond.truebranchtypes}\nfalse:{currframe.typestack}"
                 )
             currframe.emit(f".endif{cond.num}:\n")
+        case "#":
+            nextc()
+            t = get_until(sep)
+            try:
+                t = int(t, 16)
+                currframe.emit(f"mov rax, [d{len(data)}]\n")
+                currframe.push("rax", int)
+                data.append(t)
+            except ValueError:
+                err(f"expected a hex number but got x'{t}'")
+        case "f":
+            nextc()
+            t = get_until(sep)
+            try:
+                t = float(t)
+                currframe.emit(
+                    f"movss xmm0, [d{len(data)}]\nsub r10, 8\nmovss [r10],xmm0\n"
+                )
+                data.append(t)
+                currframe.typestack.append(float)
+            except ValueError:
+                err(f"expected a float but got f'{t}'")
         case _:
             t = get_until(sep)
             try:
@@ -482,6 +516,8 @@ for i in range(len(data)):
         dat += f'd{i} db "{t}", 0\n'
     elif isinstance(data[i], int):
         dat += f"d{i} dq {t}\n"
+    elif isinstance(data[i], float):
+        dat += f"d{i} dd {t}\n"
 
 with open("init.asm", "r") as init:
     print(init.read(), extern, funcdefs, start, main, "jmp exit", dat, sep="\n", end="")
