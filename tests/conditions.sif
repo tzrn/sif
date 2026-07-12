@@ -1,0 +1,10 @@
+(912315)
+@test[int]
+    <0 ? 5 .sub : 5 .add $
+    <0 ? 5 <>1 .sub : 123 .add $
+    .ipr
+;
+
+1 .test
+5 .test
+-5 .test

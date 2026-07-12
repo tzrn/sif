@@ -66,6 +66,13 @@ class Mem:
         self.typ = typ
 
 
+class Condition:
+    def __init__(self, num):
+        self.starttypestack = []
+        self.falsebranchstack = []
+        self.num = num
+
+
 class Frame:
     def __init__(self, name, param, ret, cmds={}):
         self.param = param
@@ -74,6 +81,8 @@ class Frame:
 
         self.code = f""
         self.typestack = []
+        self.ncond = 0
+        self.condstack = []
 
     def emit(self, s):
         self.code += s
@@ -91,14 +100,12 @@ mov qword [r10], {val}\n"""
 
 cmds = {
     "pr": ("print", ([str], [])),
-    "if": ("if_", ([int, 1, 1], [1])),
     "sub": ("subtract", ([int, int], [int])),
     "add": ("sum", ([int, int], [int])),
     "ipr": ("print_int", ([int], [])),
     "drop": ("drop", ([1], [])),
     "set": ("set", ([Mem(1), int, 1], [Mem(1)])),
     "get": ("get", ([Mem(1), int], [Mem(1), 1])),
-    "np": ("np", ([], [])),
     # special logic in case "."
     "ret": ("return", ([], [])),
     "loop": ("_loop", ([], [])),
@@ -229,6 +236,8 @@ def scan_functype():
         t = get_until(sep)
         _, (param, ret) = cmd(t)
         return (param, ret)
+    else:
+        return ([], [])
 
 
 while i < l:
@@ -284,7 +293,7 @@ while i < l:
         case "@":
             nextc()
 
-            f = get_until(["[", ":"])
+            f = get_until(["[", ":"] + sep)
             param, ret = scan_functype()
             if f in cmds:
                 err(f"attempt to shadow @{f}")
@@ -296,7 +305,7 @@ while i < l:
             else:
                 cmds[f] = (fname, (param, ret))
 
-            currframe = Frame(fname, param, ret)
+            currframe = Frame(f, param, ret)
             frames.append(currframe)
             currframe.typestack += param
 
@@ -327,7 +336,7 @@ while i < l:
 
             byeframe = frames.pop()
             code.append(byeframe.code)
-            currframe = frames[len(frames) - 1]
+            currframe = frames[-1]
 
             if not same_type_lists(byeframe.typestack, byeframe.ret):
                 err(
@@ -369,12 +378,13 @@ while i < l:
             # print(f"calling {t}, {currframe.typestack}")
             f, (params, rets) = cmd(t)
 
-            if t == "ret":
-                if not same_type_lists(currframe.typestack, currframe.ret):
+            if t == "ret" or t == "loop":
+                if t == "ret" and not same_type_lists(
+                    currframe.typestack, currframe.ret
+                ):
                     err(
                         f"returning {currframe.typestack} but {currframe.ret} is required"
                     )
-            elif t == "loop":
                 params = currframe.param
                 rets = currframe.ret
             elif t == "go":
@@ -403,6 +413,39 @@ while i < l:
             ]
             currframe.typestack += replace_generics_list(rets, generics)
             currframe.emit(f"call {f} ;{t}\n")
+        case "?":
+            nextc()
+            cond = currframe.typestack.pop()
+            if not cond == int:
+                err("condition must be an integer")
+
+            cond = Condition(currframe.ncond)
+            cond.starttypestack = currframe.typestack.copy()
+            currframe.ncond += 1
+            currframe.emit(
+                f"""
+            add r10, 8 ;if
+            mov rax, [r10-8]
+            test rax,rax
+            jz .false{cond.num}
+            """
+            )
+            currframe.condstack.append(cond)
+        case ":":
+            nextc()
+            cond = currframe.condstack[-1]
+            currframe.emit(f"jmp .endif{cond.num}\n.false{cond.num}:\n")
+            cond.truebranchtypes = currframe.typestack.copy()
+            currframe.typestack = cond.starttypestack
+        case "$":
+            nextc()
+            cond = currframe.condstack.pop()
+            if not same_type_lists(cond.truebranchtypes, currframe.typestack):
+                err(
+                    "condition branches must produce the same stack but you have\n"
+                    + f"true: {cond.truebranchtypes}\nfalse:{currframe.typestack}"
+                )
+            currframe.emit(f".endif{cond.num}:\n")
         case _:
             t = get_until(sep)
             try:

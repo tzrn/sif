@@ -2,7 +2,7 @@
 @test[int][int]
     1 .add
     <0 4_321 .sub
-    &loop &ret .if .go
+    ? .loop : .ret $
 ;
 
 1 .test .ipr

@@ -18,34 +18,6 @@ envp            dq      ?
 
 section '.text'
 ;; FLOW CONTROL
-if_:
-	add     r10, 8
-; cond [v1] v2
-	cmp     qword [r10+8], 0
-	jnz     .false
-
-;.true:
-	mov     rax, [r10]
-	jmp     .endif
-
-.false:
-	mov     rax, [r10-8]
-
-.endif:
-	add     r10, 8
-	mov     [r10], rax
-	ret
-
-false:
-	sub     r10, 8
-	mov     qword [r10], 0
-	ret
-
-true:
-	sub     r10, 8
-	mov     qword [r10], 1
-	ret
-
 go:
 	mov     rax, [r10]
 	add     r10, 8
@@ -61,9 +33,6 @@ _loop:
 	add     rsp, 8
 	pop     rax
 	jmp     rax
-
-np:
-	ret
 
 ;; ARITHMETIC
 sum:
