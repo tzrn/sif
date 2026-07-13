@@ -194,7 +194,9 @@ def same_types(a, b, generics={}):
             return False
         return same_type_lists(a[0], b[0]) and same_type_lists(a[1], b[1])
 
-    if isinstance(a, int):  # b is from stack thus never generic
+    if isinstance(a, int):
+        if isinstance(b, int):
+            return a == b
         if a in generics:
             a = generics[a]
             return same_types(a, b)
@@ -216,8 +218,7 @@ def replace_generics(a, generics):
     if isinstance(a, int):
         if a in generics:
             return generics[a]
-        else:
-            err(f"generic type {a} was not defined")
+        return a
     if isinstance(a, Mem):
         return Mem(replace_generics(a.typ, generics))
     if isinstance(a, tuple):
@@ -500,6 +501,12 @@ while i < l:
                 currframe.push("rax", int)
             except ValueError:
                 err(f"expected a hex number but got x'{t}'")
+        case "~":
+            nextc()
+            t = read_type()
+            if len(currframe.typestack) < 1:
+                err("trying to assert a type but the stack is empty")
+            currframe.typestack[-1] = t
         case "f":
             nextc()
             t = get_until(sep)
