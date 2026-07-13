@@ -49,6 +49,14 @@ subtract:
 	mov     [r10], rax
 	ret
 
+multiply:
+	mov     rax, [r10]
+	mov     rdx, [r10+8]
+	add     r10, 8
+	imul    rax, rdx
+	mov     [r10], rax
+	ret
+
 ;; IO
 strlen:
 	mov     rdx, [r10]							;start
@@ -121,7 +129,7 @@ print_int:
 
 ;; STACK
 drop:
-	add     r10, 8
+	add     r10, rdi
 	ret
 
 swap:

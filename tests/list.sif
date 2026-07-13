@@ -14,5 +14,5 @@
     1 .get .ipr
     511 .get .ipr
 
-    .drop .drop
+    ,2
 }

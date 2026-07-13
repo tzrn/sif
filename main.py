@@ -23,7 +23,7 @@ def nextl():
 
 
 def err(text):
-    raise Exception(f"\033[41m{line}:{char} {text}\033[0m")
+    raise Exception(f"\033[41m(@{currframe.name}) {line}:{char} {text}\033[0m")
 
 
 def get_until(endings, escape=False):
@@ -102,8 +102,8 @@ cmds = {
     "pr": ("print", ([str], [])),
     "sub": ("subtract", ([int, int], [int])),
     "add": ("sum", ([int, int], [int])),
+    "mul": ("multiply", ([int, int], [int])),
     "ipr": ("print_int", ([int], [])),
-    "drop": ("drop", ([1], [])),
     "set": ("set", ([Mem(1), int, 1], [Mem(1)])),
     "get": ("get", ([Mem(1), int], [Mem(1), 1])),
     # special logic in case "."
@@ -113,7 +113,7 @@ cmds = {
 }
 
 nfunc = 0
-data = []
+data = {}
 arena = None
 sep = ["\n", " ", "\t", "(", ";"]
 argregs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"]
@@ -241,6 +241,43 @@ def scan_functype():
         return ([], [])
 
 
+def data_name(value):
+    if not value in data:
+        n = len(data)
+        data[value] = n
+    else:
+        n = data[value]
+    return n
+
+
+def stack_move(swap, fromBottom):
+    index = get_until(sep)
+
+    try:
+        index = int(index)
+    except ValueError:
+        err(f"invalid index {index}")
+
+    if index >= len(currframe.typestack) or index < 0:
+        err(
+            f"index {index} is referencing a value beyond the stack {currframe.typestack}"
+        )
+
+    n = len(currframe.typestack) - 1
+    if fromBottom:
+        index = n - index
+    currframe.emit(f"mov rdi, {index*8}\n")
+    index = n - index
+    if swap:
+        a = currframe.typestack[index]
+        currframe.typestack[index] = currframe.typestack[n]
+        currframe.typestack[n] = a
+        currframe.emit("call swap\n")
+    else:  # copy
+        currframe.typestack.append(currframe.typestack[index])
+        currframe.emit("call copy\n")
+
+
 while i < l:
     c = source[i]
     match c:
@@ -248,9 +285,7 @@ while i < l:
             nextc()
             s = get_until(['"'], escape=True)
             nextc()
-            n = len(data)
-            currframe.push(f"d{n}", str)
-            data.append(s)
+            currframe.push(f"d{data_name(s)}", str)
         case " " | "\t":
             nextc()
         case "\n":
@@ -359,29 +394,26 @@ while i < l:
             swap = source[i] == ">"
             if swap:
                 nextc()
-            index = get_until(sep)
-
-            try:
-                index = int(index)
-            except ValueError:
-                err(f"invalid index {index}")
-
-            if index >= len(currframe.typestack):
-                err(
-                    f"index {index} is referencing a value beyond the stack {currframe.typestack}"
-                )
-
-            currframe.emit(f"mov rdi, {index*8}\n")
-            n = len(currframe.typestack) - 1
-            index = n - index
+            stack_move(swap, False)
+        case ">":
+            nextc()
+            swap = source[i] == "<"
             if swap:
-                a = currframe.typestack[index]
-                currframe.typestack[index] = currframe.typestack[n]
-                currframe.typestack[n] = a
-                currframe.emit("call swap\n")
-            else:  # copy
-                currframe.typestack.append(currframe.typestack[index])
-                currframe.emit("call copy\n")
+                nextc()
+            stack_move(swap, True)
+        case ",":
+            nextc()
+            n = get_until(sep)
+            try:
+                n = int(n)
+            except ValueError:
+                err(f"expected a number but got  -{n}")
+
+            stacklen = len(currframe.typestack)
+            if n > stacklen:
+                err(f"trying to drop {n} elements but the stack is only {stacklen}")
+            currframe.typestack = currframe.typestack[: stacklen - n]
+            currframe.emit(f"mov rdi, {n*8}\ncall drop\n")
         case ".":
             nextc()
             t = get_until(sep)
@@ -390,15 +422,16 @@ while i < l:
             # print(f"calling {t}, {currframe.typestack}")
             f, (params, rets) = cmd(t)
 
-            if t == "ret" or t == "loop":
-                if t == "ret" and not same_type_lists(
-                    currframe.typestack, currframe.ret
-                ):
+            if t == "ret":
+                if not same_type_lists(currframe.typestack, currframe.ret):
                     err(
-                        f"returning {currframe.typestack} but {currframe.ret} is required"
+                        f"function @{currframe.name} must return {currframe.ret} but you're returning {currframe.typestack}"
                     )
-                params = currframe.param
+                params = []
+                rets = []
+            elif t == "loop":
                 rets = currframe.ret
+                params = currframe.param
             elif t == "go":
                 callee = currframe.pop()
                 if not isinstance(callee, tuple):
@@ -463,9 +496,8 @@ while i < l:
             t = get_until(sep)
             try:
                 t = int(t, 16)
-                currframe.emit(f"mov rax, [d{len(data)}]\n")
+                currframe.emit(f"mov rax, {t} ;int\n")
                 currframe.push("rax", int)
-                data.append(t)
             except ValueError:
                 err(f"expected a hex number but got x'{t}'")
         case "f":
@@ -474,9 +506,8 @@ while i < l:
             try:
                 t = float(t)
                 currframe.emit(
-                    f"movss xmm0, [d{len(data)}]\nsub r10, 8\nmovss [r10],xmm0\n"
+                    f"movss xmm0, [d{data_name(t)}] ;float\nsub r10, 8\nmovss [r10],xmm0\n"
                 )
-                data.append(t)
                 currframe.typestack.append(float)
             except ValueError:
                 err(f"expected a float but got f'{t}'")
@@ -484,9 +515,8 @@ while i < l:
             t = get_until(sep)
             try:
                 t = int(t)
-                currframe.emit(f"mov rax, [d{len(data)}]\n")
+                currframe.emit(f"mov rax, {t} ;int\n")
                 currframe.push("rax", int)
-                data.append(t)
             except ValueError:
                 err(f"unexpected token '{t}'")
 
@@ -510,14 +540,12 @@ mov [argv], rax
 """
 
 dat = "section '.data'\n"
-for i in range(len(data)):
-    t = data[i]
-    if isinstance(data[i], str):
-        dat += f'd{i} db "{t}", 0\n'
-    elif isinstance(data[i], int):
-        dat += f"d{i} dq {t}\n"
-    elif isinstance(data[i], float):
-        dat += f"d{i} dd {t}\n"
+for d in data:
+    i = data[d]
+    if isinstance(d, str):
+        dat += f'd{i} db "{d}", 0\n'
+    elif isinstance(d, float):
+        dat += f"d{i} dd {d}\n"
 
 with open("init.asm", "r") as init:
     print(init.read(), extern, funcdefs, start, main, "jmp exit", dat, sep="\n", end="")

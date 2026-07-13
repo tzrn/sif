@@ -1,19 +1,19 @@
 (120)
-@mul[int,int,int][int]
+@mymul[int,int,int][int]
     (result, a, b)
     <0 <>3 <>1 .add
     (b, a, r+b)
     <>2 <>1 1 .sub
     <0
     
-    ? <>1 .mul : .drop .drop $
+    ? <>1 .mymul : ,2 $
 ;
 
 @fact[int][int]
     <0 1 .sub ?
     0 <>1 (0,5)
     <0 1 .sub .fact (0,5,4)
-    .mul
+    .mymul
     :
     $
 ;
