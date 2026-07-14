@@ -74,10 +74,11 @@ class Condition:
 
 
 class Frame:
-    def __init__(self, name, param, ret, cmds={}):
+    def __init__(self, name, param, ret, cmds):
         self.param = param
         self.ret = ret
         self.name = name
+        self.cmds = cmds
 
         self.code = f""
         self.typestack = []
@@ -98,7 +99,7 @@ mov qword [r10], {val}\n"""
         return self.typestack.pop()
 
 
-cmds = {
+default_cmds = {
     "pr": ("print", ([str], [])),
     "sub": ("subtract", ([int, int], [int])),
     "add": ("sum", ([int, int], [int])),
@@ -120,14 +121,22 @@ argregs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"]
 floatargregs = ["xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7"]
 extern = ""
 code = []
-currframe = Frame("main", [], [], cmds)
+currframe = Frame("main", [], [], default_cmds)
 frames = [currframe]
 
 
+def cmd_exists(t):
+    for i in range(len(frames) - 1, -1, -1):
+        if t in frames[i].cmds:
+            return frames[i].cmds[t]
+    return False
+
+
 def cmd(t):
-    if t in cmds:
-        return cmds[t]
-    err(f"undefined function {t}")
+    c = cmd_exists(t)
+    if not c:
+        err(f"undefined function {t}")
+    return c
 
 
 types = {"int": int, "str": str, "float": float, "mem": Mem}
@@ -332,7 +341,7 @@ while i < l:
 
             f = get_until(["[", ":"] + sep)
             param, ret = scan_functype()
-            if f in cmds:
+            if cmd_exists(f):
                 err(f"attempt to shadow @{f}")
 
             fname = f"f{nfunc}"
@@ -340,9 +349,9 @@ while i < l:
             if f == "":  # lambda
                 currframe.push(fname, (param, ret))
             else:
-                cmds[f] = (fname, (param, ret))
+                currframe.cmds[f] = (fname, (param, ret))
 
-            currframe = Frame(f, param, ret)
+            currframe = Frame(f, param, ret, {})
             frames.append(currframe)
             currframe.typestack += param
 
@@ -351,13 +360,13 @@ while i < l:
             nextc()
             f = get_until(["[", ":"])
             param, ret = scan_functype()
-            if f in cmds:
+            if cmd_exists(f):
                 err(f"attempt to shadow @{f}")
             if len(ret) > 1:
                 err("external function cannot return multiple values")
 
             fname = f"f{nfunc}"
-            cmds[f] = (fname, (param, ret))
+            currframe.cmds[f] = (fname, (param, ret))
             nfunc += 1
 
             extern += f"extrn {f}\n{fname}:\n"
@@ -418,8 +427,6 @@ while i < l:
         case ".":
             nextc()
             t = get_until(sep)
-            if not t in cmds:
-                err(f"undefined function .{t}")
             # print(f"calling {t}, {currframe.typestack}")
             f, (params, rets) = cmd(t)
 

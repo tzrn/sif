@@ -1,0 +1,13 @@
+("hwHelloWorldhw")
+@test
+    @test2;
+    @a "Hello" .pr;
+    @b "World" .pr;
+    .a .b .test2
+;
+@test2
+    @a[][str] "w";
+    @b:a "h";
+    .a .b .pr .pr
+;
+.test2 .test .test2
