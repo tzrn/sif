@@ -1,6 +1,6 @@
 # Sif
 
-A stack based, functional language and a fasm (Linux, x86_64) compiler for it.
+A stack based, functional language and a compiler (to Linux x86_64 fasm) for it.
 
 ## Usage
 
@@ -13,7 +13,7 @@ A stack based, functional language and a fasm (Linux, x86_64) compiler for it.
 - `1 2 3` - this puts 1, 2 and 3 onto the stack. When calling functions, they might consume stack and/or put new values on it. For example `1 2 3 .add .ipr .ipr` 1, 2 and 3 are put onto the stack, then 2 and 3 are added and printed then 1 is printed so the output is *51*.
 - `<n` copies values removed by n from the top of the stack `1 2 3 <1` will copy 2 to the stack. `<0` copies the top of the stack. `<>n` will replace current element with the nth one. `>n` and `><n` work the same way but count from the bottom of the stack. For example `1 2 3 >0` will copy 1 to the top.
 - `,n` drops n values. For example `1 2 3 ,2` will drop 3 and 2.
-- the 3 basic type that you have are strings - `"This is a string"` (escape sequences - `"\n \" \\"`), integers - `123` or `#FFFF00` for hext and floats - `f1`, `f2.48`. 
+- the 3 basic type that you have are strings - `"This is a string"` (escape sequences - `"\n \" \\"`), integers - `123` (or `#FFFF00` for hex) and floats - `f1`, `f2.48`. 
 - you can assert a type with `~type` for example `~float` will assert that the value on the top of the stack is float.
 - anything enclosed in parentheses is ignored `(ignored)`
 
@@ -31,7 +31,7 @@ A stack based, functional language and a fasm (Linux, x86_64) compiler for it.
 }
 ```
 
-### Built-in functions
+### Builtin functions
 
 - @pr:  [str][] - print a string
 - @sub: [int, int][int] - subtract integers
@@ -54,7 +54,7 @@ A stack based, functional language and a fasm (Linux, x86_64) compiler for it.
     .add .add
 ;
 ```
-- If a function doesn't have return values [] can be ommited. If it has neither parameters nor return values then the whole signiture can be ommited:
+- If a function doesn't have return values [] can be omitted. If it has neither parameters nor return values then the whole signature can be omitted:
 ```
 @greet[str]
     "Hello, " .pr .pr "\n" .pr
@@ -80,7 +80,7 @@ A stack based, functional language and a fasm (Linux, x86_64) compiler for it.
     .sub .sub
 ;
 ```
-- paramegers and return values can be generic:
+- parameters and return values can be generic:
 ```
 @swap[1,2][2,1]
     <>1
@@ -95,7 +95,7 @@ false_branch $
 ```
 Condition can be 0 for false or any other integer for true. Both branches must produce the same stack.
 
-### External functitions
+### External functions
 
 - You can define external functions as follows (provided that you link them):
 ```

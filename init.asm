@@ -1,7 +1,7 @@
 format ELF64
 public main
 
-;r10 is the stack pointers
+;r10 is the stack pointer
 ;r11 is the current arena alloc stack's pointer
 STACK_SIZE = 1024
 ARENA_SIZE = 64
