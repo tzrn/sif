@@ -71,7 +71,7 @@ A stack based, functional language and a compiler (to Linux x86_64 fasm) for it.
 
 "Hello" @[str][str] ,1 "Hi"; .processPrint
 ``` 
-- You can make functions type the same as an other functions type with `:`:
+- You can make functions type the same as an other function's type with `:`:
 ```
 @add3[int,int,int][int]
     .add .add

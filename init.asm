@@ -70,6 +70,14 @@ not_:
 	mov     [r10], rax
 	ret
 
+and_:
+	mov     rax, [r10]
+	mov     rdx, [r10+8]
+	add     r10, 8
+	and     rax, rdx
+	mov     [r10], rax
+	ret
+
 ;; IO
 strlen:
 	mov     rdx, [r10]							;start

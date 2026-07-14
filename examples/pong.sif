@@ -1,0 +1,94 @@
+@i[][int] 0;
+@width:i 800;
+@height:i 600;
+@boxw:i 200;
+@speed:i 3;
+@bradius[][float] f20;
+
+.width .height "Pong" .InitWindow
+60 .SetTargetFPS
+
+@x:i 0;@y:i 1;
+@bx:i 2;@by:i 3;
+@bvx:i 4;@bvy:i 5;
+
+@movebox[*int,int,int][*int]
+    (lst, field, diff)
+    <>1 ><0
+    (field,diff,lst)
+    >0 .get
+    (field,diff,lst,val)
+    <0 >1 .add <0 .isneg ? : <>1 $
+    <0 >1 .add .boxw .add .width .sub .isneg ? : <>1 $
+    ,1
+    >0 <>1 .set ><0 ,2
+;
+
+@get2[*1,int,int][*1,1,1]
+    >0 >1 .get <>1
+    (list,x,y,valx,list)
+    >2 .get <>1 ,1
+    (list,x,y,valx,valy)
+    ><2 ,1 ><1 ,1
+;
+
+@isHit[*int][int]
+    .bx .x .get2
+    .sub
+    <0 <0 .isneg ? ,2 0 :
+        .boxw .sub .isneg ? ,1 1 : ,1 0  $
+    $
+    <>1 .by .get .height .sub 70 .add .isneg ? 0
+    : 1 $ <>1 ,1 .and
+;
+
+@moveball[*int][*int]
+    .bx .bvx .get2 .add 
+    <0 .width .sub .isneg ?
+    : >0 .bvx 0 .speed .sub .set ,1 $
+    <0 .isneg ?
+    >0 .bvx .speed .set ,1
+    : $
+    .bx <>1 .set
+
+    .by .bvy .get2 .add 
+    <0 .isneg ? >0 .bvy .speed .set ,1 : $
+    .by <>1 .set
+    >0 .isHit ? .bvy 0 .speed .sub .set : $
+;
+
+@main[*int][*int]
+    .BeginDrawing
+        #FFFFFFFF .ClearBackground
+    .EndDrawing
+
+    .x .y .get2 .boxw 20 #FF0000FF .DrawRectangle
+    .bx .by .get2 .bradius #FF0000FF .DrawCircle
+
+    .KEY_A .KeyDown ? .x 0 .speed .sub .movebox :$
+    .KEY_D .KeyDown ? .x .speed .movebox :$
+
+    .by .get .height .sub 20 .add .isneg ?
+    : .ret $
+
+    .moveball
+    (<0 .isHit .ipr
+    .x .get .ipr "\n" .pr)
+
+    0 0 .DrawFPS
+    .WindowShouldClose ?
+    .ret : .loop $
+;
+
+{
+    1 *int
+    .x 250 .set
+    .y .height 50 .sub .set
+    .bx 250 .set
+    .by 250 .set
+    .bvx .speed .set
+    .bvy .speed .set
+    .main ,1
+}
+
+.CloseWindow

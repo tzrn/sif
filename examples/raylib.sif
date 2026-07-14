@@ -8,3 +8,13 @@
 !DrawText[int,int,int,int,str]
 !DrawCircle[int,int,float,int]
 !DrawRectangle[int,int,int,int,int]
+!IsKeyDown[int][int]
+!DrawFPS[int,int][]
+
+@KeyDown[int][int]
+    .IsKeyDown 1 .and
+;
+
+@key[][int] 0;
+@KEY_A:key 65;
+@KEY_D:key 68;

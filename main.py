@@ -109,6 +109,7 @@ default_cmds = {
     "get": ("get", ([Mem(1), int], [Mem(1), 1])),
     "not": ("not_", ([int], [int])),
     "isneg": ("isneg", ([int], [int])),
+    "and": ("and_", ([int, int], [int])),
     # special logic in case "."
     "ret": ("return", ([], [])),
     "loop": ("_loop", ([], [])),
@@ -167,9 +168,6 @@ def read_type():
         ret = []
         if source[i] == "[":
             ret = read_type_list()
-            for r in ret:
-                if isinstance(r, int) and not r in param:
-                    err(f"you cannot use generic '{ret}' because it wasn't in inputs")
         return (param, ret)
     elif source[i] == "*":
         nextc()
