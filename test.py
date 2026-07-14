@@ -4,10 +4,6 @@ import os
 
 os._posix_spawn = True
 
-tmp = "/tmp/out"
-sp.run(["touch", tmp])
-sp.run(["chmod", "+x", tmp])
-
 
 def test(f):
     result = sp.run(["./run", f], capture_output=True)

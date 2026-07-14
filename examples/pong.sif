@@ -1,8 +1,8 @@
 @i[][int] 0;
 @width:i 800;
 @height:i 600;
-@boxw:i 200;
-@speed:i 3;
+@boxw:i 100;
+@speed:i 10;
 @bradius[][float] f20;
 
 .width .height "Pong" .InitWindow
@@ -57,6 +57,15 @@
     >0 .isHit ? .bvy 0 .speed .sub .set : $
 ;
 
+@reset[*int][*int]
+    .x 250 .set
+    .y .height 50 .sub .set
+    .bx 250 .set
+    .by 250 .set
+    .bvx .speed .set
+    .bvy 0 .speed .sub .set
+;
+
 @main[*int][*int]
     .BeginDrawing
         #FFFFFFFF .ClearBackground
@@ -69,7 +78,7 @@
     .KEY_D .KeyDown ? .x .speed .movebox :$
 
     .by .get .height .sub 20 .add .isneg ?
-    : .ret $
+    : .reset $
 
     .moveball
     (<0 .isHit .ipr
@@ -82,12 +91,7 @@
 
 {
     1 *int
-    .x 250 .set
-    .y .height 50 .sub .set
-    .bx 250 .set
-    .by 250 .set
-    .bvx .speed .set
-    .bvy .speed .set
+    .reset
     .main ,1
 }
 
