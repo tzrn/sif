@@ -57,6 +57,19 @@ multiply:
 	mov     [r10], rax
 	ret
 
+;;LOGIC
+isneg:
+	mov     rax, [r10]
+	sar     rax, 63
+	mov     [r10], rax
+	ret
+
+not_:
+	mov     rax, [r10]
+	not     rax
+	mov     [r10], rax
+	ret
+
 ;; IO
 strlen:
 	mov     rdx, [r10]							;start

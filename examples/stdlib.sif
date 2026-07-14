@@ -1,0 +1,29 @@
+@append[*1,1][*1]
+    <>1 0 .get ~int 1 .add
+    ><0
+    (size,list,value)
+    >0 <>1 .set <>1
+    (list,size)
+    0 <>1 .set ~*1
+;
+
+@len[*1][int]
+    0 .get ~int <>1 ,1
+;
+
+@map[*1,[1][1]][*1]
+    @_map[*1,[1][1],int][*1]
+        <0 ?
+            ><0
+            (int,[1][1],*1)
+            >0 .get
+            (int,[1][1],*1,val)
+            >1 .go >0 <>1 .set ><0
+            1 .sub
+            .loop
+        :
+            ,2
+        $
+    ;
+    >0 .len ._map
+;

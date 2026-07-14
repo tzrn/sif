@@ -1,0 +1,74 @@
+400 400 "Hello world" .InitWindow
+60 .SetTargetFPS
+
+@addBall[int,int,int,int,*int,int][]
+    (x,y,vx,vy,list,index)
+    4 .mul <>1
+    <1        >0 .set
+    <1 1 .add >1 .set
+    <1 2 .add >2 .set
+    <1 3 .add >3 .set ,6
+;
+
+@drawBall[*int,int]
+    (list,index)
+    4 .mul <>1
+    (ind*4,list)
+    >0 .get
+    (ind*4,list,x)
+    ><0 1 .add .get
+    (x,list,y)
+    <>1 ,1
+    f20 #FF0000FF .DrawCircle
+;
+
+@addReset[int,int][int]
+    .add
+    <0 450 .sub .isneg .not ?
+    ,1 0 .ret :$
+    <0 .isneg ?
+    ,1 450 .ret :$
+;
+
+@moveBall[*int,int]
+    4 .mul
+    <>1 >0 .get
+    (n, list, x)
+    <>1 >0 2 .add .get <>1
+    (n, x, vx, list)
+    >0 1 .add .get <>1
+    >0 3 .add .get <>1
+    (n,x,vx,y,vy,lst)
+    >0 >1 >2 .addReset .set
+    >0 1 .add >3 >4 .addReset .set
+    ,6
+;
+
+@useBalls[*int,int,[*int,int][]]
+    ><0 <1 1 .add ?
+    (func,i,lst)
+    >2 >1 >0 .go
+    <>1 1 .sub <>1 ><0
+    .loop : ,3 $
+;
+
+{
+    1 *int
+    100 100 1 1 >0 0 .addBall
+    100 220 1 -1 >0 1 .addBall
+    200 180 -1 1 >0 2 .addBall
+    270 100 1 1 >0 3 .addBall
+
+    @main[*int]
+        .BeginDrawing
+            #FF000000 .ClearBackground
+            <0 3 &drawBall .useBalls
+            <0 3 &moveBall .useBalls
+        .EndDrawing
+
+        .WindowShouldClose
+        ? ,1 .ret : .loop $
+    ;
+    .main
+    .CloseWindow
+}

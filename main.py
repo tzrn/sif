@@ -107,6 +107,8 @@ default_cmds = {
     "ipr": ("print_int", ([int], [])),
     "set": ("set", ([Mem(1), int, 1], [Mem(1)])),
     "get": ("get", ([Mem(1), int], [Mem(1), 1])),
+    "not": ("not_", ([int], [int])),
+    "isneg": ("isneg", ([int], [int])),
     # special logic in case "."
     "ret": ("return", ([], [])),
     "loop": ("_loop", ([], [])),
