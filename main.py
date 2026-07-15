@@ -104,6 +104,7 @@ default_cmds = {
     "sub": ("subtract", ([int, int], [int])),
     "add": ("sum", ([int, int], [int])),
     "mul": ("multiply", ([int, int], [int])),
+    "div": ("divide", ([int, int], [int, int])),
     "ipr": ("print_int", ([int], [])),
     "set": ("set", ([Mem(1), int, 1], [Mem(1)])),
     "get": ("get", ([Mem(1), int], [Mem(1), 1])),

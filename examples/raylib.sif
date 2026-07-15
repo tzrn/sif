@@ -18,3 +18,5 @@
 @key[][int] 0;
 @KEY_A:key 65;
 @KEY_D:key 68;
+@KEY_W:key 87;
+@KEY_S:key 83;

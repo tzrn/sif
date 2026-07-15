@@ -37,6 +37,7 @@ A stack based, functional language and a compiler (to Linux x86_64 fasm) for it.
 - @sub: [int, int][int] - subtract integers
 - @add: [int, int][int] - add integers
 - @mul: [int, int][int] - multiply integers
+- @div: [int, int][int, int] - divide two numbers, return remainder and result
 - @ipr: [int][] - print an integer
 - @set: [*1, int, 1][*1] - set value in an array
 - @get: [*1, int][*1, 1] - get value from an array
@@ -71,7 +72,7 @@ A stack based, functional language and a compiler (to Linux x86_64 fasm) for it.
 
 "Hello" @[str][str] ,1 "Hi"; .processPrint
 ``` 
-- You can make functions type the same as an other function's type with `:`:
+- You can make function's type the same as an other function's type with `:`:
 ```
 @add3[int,int,int][int]
     .add .add

@@ -57,6 +57,15 @@ multiply:
 	mov     [r10], rax
 	ret
 
+divide:
+	mov     rax, [r10+8]
+	cqo
+	mov     rbx, [r10]
+	idiv    rbx
+	mov     [r10+8], rax						;result
+	mov     [r10], rdx							;remainder
+	ret
+
 ;;LOGIC
 isneg:
 	mov     rax, [r10]
