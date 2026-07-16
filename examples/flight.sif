@@ -1,7 +1,7 @@
 @i[][int] 0;
 @w:i 600;
 @h:i 600;
-@speed:i 10;
+@speed:i 8;
 .w .h "flight" .InitWindow
 60 .SetTargetFPS
 
@@ -18,23 +18,31 @@
     0
     >1 .sq
     >1 .sqdiff >0 .mul .speed .div ,1 .add 200 .add
-    (>0 >1 .sqdiff .div ,1 .add)
     .w
     >1
     #FF00AA00 .DrawRectangle
     >1 ? 1 .sub .loop : ,2 .ret $
 ;
 
-@main[int][int]
+@main[int,int][int,int]
     .BeginDrawing
         #FF00FF00 .ClearBackground
         0 0 .w 200 #FFFF0000 .DrawRectangle
         0 0 .DrawFPS
-        >0 25 .lines
-        240 .h 130 .sub 100 110 #44000000 .DrawRectangle
-        250 .h 150 .sub 100 100 #FF0000FF .DrawRectangle
-        250 .h 80 .sub 100 30 #FF0000AA .DrawRectangle
+        >1 25 .lines
+        >0 5 .sub .h 130 .sub 100 110 #44000000 .DrawRectangle
+        >0 .h 150 .sub 100 100 #FF0000FF .DrawRectangle
+        >0 .h 80 .sub 100 30 #FF0000BB .DrawRectangle
     .EndDrawing
+
+    <>1
+    .KEY_A .KeyDown ?
+        3 .sub
+    : $
+    .KEY_D .KeyDown ?
+        3 .add
+    : $
+    <>1
 
     .KEY_S .KeyDown ?
         1 .sub
@@ -48,5 +56,5 @@
     .ret : .loop $
 ;
 
-0 .main
+250 0 .main
 .CloseWindow

@@ -1,0 +1,106 @@
+@i[][int] 0;
+@w:i 660;
+@h:i 660;
+@b:i 10;
+@bw:i 60;
+
+.w .h "life" .InitWindow
+10 .SetTargetFPS
+
+@getCoord[int][int]
+    <0 .isneg ? ,1 59 .ret : $
+    <0 60 .sub .isneg ? : ,1 0 .ret $
+;
+
+@getVal[*int,int,int][int]
+    (list,x,y)
+    .getCoord 60 .mul <>1 .getCoord .add .get <>1 ,1
+;
+
+@getSum[*int,int,int][int,int]
+    >0 >1 >2 .getVal >0
+    
+    (list,x,y,ValC,list)
+    >1 1 .sub >2 .getVal >0
+    (list,x,y,ValC,ValL,list)
+    >1 1 .add >2 .getVal >0
+    (list,x,y,ValC,ValL,ValR,list)
+    >1 >2 1 .sub .getVal >0
+    (list,x,y,ValC,ValL,ValR,ValU,list)
+    >1 >2 1 .add .getVal >0
+    (list,x,y,ValC,ValL,ValR,ValU,ValD,list)
+
+    >1 1 .sub >2 1 .sub .getVal >0
+    (list,x,y,ValC,ValL,ValR,ValU,ValD,ValLU,list)
+    >1 1 .add >2 1 .sub .getVal >0
+    (list,x,y,ValC,ValL,ValR,ValU,ValD,ValLU,ValRU,list)
+    >1 1 .sub >2 1 .add .getVal >0
+    (list,x,y,ValC,ValL,ValR,ValU,ValD,ValLU,ValRU,ValLD,list)
+    >1 1 .add >2 1 .add .getVal
+    (list,x,y,ValC,ValL,ValR,ValU,ValD,ValLU,ValRU,ValLD,ValRD)
+    .add .add .add .add .add .add .add ><1 ,1 ><0 ,2
+;
+
+@newVal[*int,int,int][int]
+    (Any live cell with fewer than two live neighbours dies, as if by underpopulation.)
+    .getSum <0 2 .sub .isneg ? 
+        ,2 0
+    :
+        (Any dead cell with exactly three live neighbours becomes a live cell, as if by reproduction.)
+        <0 3 .sub ? 
+            (Any live cell with more than three live neighbours dies, as if by overpopulation.)
+            <0 4 .sub .isneg ? ,1 : ,2 0 $
+        :
+            ,2 1
+        $
+    $
+;
+
+@drawBoard[int,*int]
+    >0 .get ?
+    >0 .bw .div (y,x)
+    .b 1 .add .mul <>1
+    .b 1 .add .mul
+    .b <0 #FFFFFFFF .DrawRectangle : $
+    >0 ? <>1 1 .sub <>1 .loop : ,2 .ret $
+;
+
+@updateBoard[*int,*int,int][*int,*int]
+    (old,new,n)
+    ><0 <>1
+    (n,new,old)
+    <0 >0 .bw .div <>1
+    (n,new,old,old,y,x)
+    .newVal
+    (n,new,old,newval)
+    <>1 ><1
+    (n,old,newval,new)
+    <>1 >0 <>1 .set
+    (n,old,new)
+    ><0 1 .sub <0 .isneg ? ,1 : .loop $
+;
+
+@main[*int,*int]
+    .BeginDrawing
+        #FFFF8888 .ClearBackground
+        3600 <1 .drawBoard
+    .EndDrawing
+
+    3600 .updateBoard <>1
+
+    .WindowShouldClose ?
+    ,2 .ret : .loop $
+;
+
+@fill[int,*int]
+    >0 >0 13 .div <>1 ,1 9 .div ,1 2 .div <>1 ,1 .set
+    >0 ? >0 1 .sub ><0 ,1 .loop : ,2 $
+;
+
+{
+    8 *int
+    8 *int
+    3600 <1 .fill
+    .main
+}
+.CloseWindow
