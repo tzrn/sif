@@ -10,6 +10,8 @@
 !DrawRectangle[int,int,int,int,int]
 !IsKeyDown[int][int]
 !DrawFPS[int,int][]
+!DrawPixel[int,int,int][]
+!ColorFromHSV[float,float,float][int]
 
 @KeyDown[int][int]
     .IsKeyDown 1 .and
@@ -20,3 +22,5 @@
 @KEY_D:key 68;
 @KEY_W:key 87;
 @KEY_S:key 83;
+@KEY_I:key 73;
+@KEY_O:key 79;

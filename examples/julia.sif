@@ -1,0 +1,91 @@
+@i[][int] 0;
+@w:i 600;
+@h:i 600;
+@c[][float,float] f-0.79 f0.15;
+@diff[][float] f0.005;
+
+@cmul[float,float,float,float][float,float]
+    (r1,i1)(r2,i2)
+    >0 >2 .fmul
+    >0 >3 .fmul
+    (r1,i1,r2,i2, r1*r2, r1*i2)
+    >1 >2 .fmul .fadd <>1
+    (r1,i1,r2,i2, r1*i2+i1*r2, r1*r2)
+    f0 >1 >3 .fmul .fsub .fadd
+    ><0 ,1 ><1 ,3
+;
+
+@cadd[float,float,float,float][float,float]
+    (r1,i1,r2,i2)
+    ><0 .fadd ><0 .fadd
+;
+
+@fpr[float]
+    f100 .fmul .f2i .ipr "\n" .pr
+;
+
+@calcPoint[*float,int,float,float][float]
+    (n,x,y)
+    >2 >3 .cmul
+    >0 0 .get <>1 1 .get <>1 ,1 .cadd
+    <1 <1 .fadd f0.3 .fadd .f2i .isneg ? ,4 f-1 .ret :
+        ><1 1 .sub <0 .isneg ? ,1 .fadd <>1 ,1 : ><1 .loop $
+    $
+;
+
+@get,[*1,int][1]
+    .get <>1 ,1
+;
+
+@drawSetX[*float,int,int] (x,y)
+    (calculate and point and draw it)
+    >1 >2
+
+    >0 30 >1 .i2f >2 .i2f
+    (n,x,y)
+    <>1 >0 2 .get, .fmul .w .i2f .fdiv >0 3 .get, .fsub
+    <>1 >0 2 .get, .fmul .h .i2f .fdiv >0 3 .get, .fsub
+    .calcPoint <0 .f2i .isneg ? ,3 : 
+    >0 3 .get, .fadd >0 2 .get, .fdiv f5000 .fmul
+    f1 f1 .ColorFromHSV .DrawPixel $
+
+    <>1 1 .sub <0 .isneg ?
+    ,3 : <>1 .loop $
+;
+
+@drawSet[*float,int] (y)
+    >0 .w >1 .drawSetX
+    1 .sub >1 .isneg ? ,2 : .loop $
+;
+
+.w .h "julia" .InitWindow
+60 .SetTargetFPS
+
+@main[*float]
+    .BeginDrawing
+        #FF000000 .ClearBackground
+        >0 .h .drawSet
+    .EndDrawing
+
+    .KEY_A .KeyDown ? 0 .get .diff .fadd 0 <>1 .set : $
+    .KEY_D .KeyDown ? 0 .get .diff .fsub 0 <>1 .set : $
+    .KEY_W .KeyDown ? 1 .get .diff .fadd 1 <>1 .set : $
+    .KEY_S .KeyDown ? 1 .get .diff .fsub 1 <>1 .set : $
+    .KEY_O .KeyDown ? 2 .get f0.1 .fadd >0 3 <2 f2 .fdiv .set ,1 2 <>1 .set : $
+    .KEY_I .KeyDown ? 2 .get f0.1 .fsub >0 3 <2 f2 .fdiv .set ,1 2 <>1 .set : $
+
+    .WindowShouldClose ? ,1 : .loop $
+;
+
+{
+    1 *float
+    (c)
+    0 f-0.79 .set
+    1 f0.15 .set
+
+    (scale,offset)
+    2 f3 .set
+    3 f1.5 .set
+    .main
+}
+.CloseWindow

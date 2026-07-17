@@ -17,7 +17,7 @@
 @lines[int,int](offset,n)
     0
     >1 .sq
-    >1 .sqdiff >0 .mul .speed .div ,1 .add 200 .add
+    >1 .sqdiff >0 .mul .speed .div ,1 .add 300 .add
     .w
     >1
     #FF00AA00 .DrawRectangle
@@ -27,9 +27,9 @@
 @main[int,int][int,int]
     .BeginDrawing
         #FF00FF00 .ClearBackground
-        0 0 .w 200 #FFFF0000 .DrawRectangle
+        0 0 .w 300 #FFFF0000 .DrawRectangle
         0 0 .DrawFPS
-        >1 25 .lines
+        >1 17 .lines
         >0 5 .sub .h 130 .sub 100 110 #44000000 .DrawRectangle
         >0 .h 150 .sub 100 100 #FF0000FF .DrawRectangle
         >0 .h 80 .sub 100 30 #FF0000BB .DrawRectangle

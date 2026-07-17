@@ -111,6 +111,12 @@ default_cmds = {
     "not": ("not_", ([int], [int])),
     "isneg": ("isneg", ([int], [int])),
     "and": ("and_", ([int, int], [int])),
+    "i2f": ("i2f", ([int], [float])),
+    "f2i": ("f2i", ([float], [int])),
+    "fdiv": ("floatdiv", ([float, float], [float])),
+    "fmul": ("floatmul", ([float, float], [float])),
+    "fadd": ("floatadd", ([float, float], [float])),
+    "fsub": ("floatsub", ([float, float], [float])),
     # special logic in case "."
     "ret": ("return", ([], [])),
     "loop": ("_loop", ([], [])),
@@ -149,7 +155,7 @@ types = {"int": int, "str": str, "float": float, "mem": Mem}
 def get_type(t):
     if t in types:
         return types[t]
-    raise err(f"invalid type {t}")
+    raise err(f"invalid type '{t}'")
 
 
 def read_type_list():

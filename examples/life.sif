@@ -61,7 +61,7 @@
     >0 .bw .div (y,x)
     .b 1 .add .mul <>1
     .b 1 .add .mul
-    .b <0 #FFFFFFFF .DrawRectangle : $
+    .b <0 >0 >0 .mul .i2f f1 f1 .ColorFromHSV .DrawRectangle : $
     >0 ? <>1 1 .sub <>1 .loop : ,2 .ret $
 ;
 
@@ -82,7 +82,7 @@
 
 @main[*int,*int]
     .BeginDrawing
-        #FFFF8888 .ClearBackground
+        #FF330033 .ClearBackground
         3600 <1 .drawBoard
     .EndDrawing
 
@@ -93,7 +93,7 @@
 ;
 
 @fill[int,*int]
-    >0 >0 13 .div <>1 ,1 9 .div ,1 2 .div <>1 ,1 .set
+    >0 >0 51 .div <>1 ,1 9 .div ,1 2 .div <>1 ,1 .set
     >0 ? >0 1 .sub ><0 ,1 .loop : ,2 $
 ;
 

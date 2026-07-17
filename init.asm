@@ -66,6 +66,49 @@ divide:
 	mov     [r10], rdx							;remainder
 	ret
 
+i2f:
+	cvtsi2ss xmm0, [r10]
+	movss    [r10], xmm0
+	ret
+
+f2i:
+	movss     xmm0, [r10]
+	cvttss2si rax, xmm0
+	mov       [r10], rax
+	ret
+
+floatdiv:
+	movss	xmm0, [r10+8]
+	movss	xmm1, [r10]
+	divss	xmm0, xmm1
+	add     r10, 8
+	movss   [r10], xmm0
+	ret
+
+floatmul:
+	movss	xmm0, [r10+8]
+	movss	xmm1, [r10]
+	mulss	xmm0, xmm1
+	add     r10, 8
+	movss   [r10], xmm0
+	ret
+
+floatsub:
+	movss	xmm0, [r10+8]
+	movss	xmm1, [r10]
+	subss	xmm0, xmm1
+	add     r10, 8
+	movss   [r10], xmm0
+	ret
+
+floatadd:
+	movss	xmm0, [r10+8]
+	movss	xmm1, [r10]
+	addss	xmm0, xmm1
+	add     r10, 8
+	movss   [r10], xmm0
+	ret
+
 ;;LOGIC
 isneg:
 	mov     rax, [r10]
