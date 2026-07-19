@@ -1,0 +1,66 @@
+@i[][int] 0;
+@w:i 1024;
+@h:i 650;
+@rules:i 86;
+
+.w .h "automata" .InitWindow
+60 .SetTargetFPS
+
+@pow[int,int,int][int]
+    (res,n,p)
+    <0 ? ><0 >1 .mul ><0 1 .sub .loop : ,2 $
+;
+
+@2pow[int][int]
+    2 1 ><0 .pow
+;
+
+@getCoord[int][int]
+    <0 .isneg ? ,1 .w 1 .sub :
+    <0 .w .sub .isneg ? : ,1 0 $ $
+;
+
+@getSum[int,*int][int]
+    >0 1 .sub .getCoord .get <>1
+    >0 .get 2 .mul <>1
+    >0 1 .add .getCoord .get 4 .mul <>1
+    ,1 .add .add <>1 ,1
+;
+
+@drawLine[int,int,*int]
+    (y,x,*int)
+    >1 >0 
+    >2 >1 .get <>1 ,1 ? 
+    >1 >2 .getSum .i2f f8 .fdiv f360 .fmul f1 f1 .ColorFromHSV : #FF000000 $
+    .DrawPixel
+    <>1 1 .sub <0 ? <>1 .loop : ,3 $
+;
+
+@getRule[int][int]
+    .2pow .rules .and ? 1 : 0 $
+;
+
+@update[int,*int,*int]
+    >0 >1 .getSum .getRule
+    >2 <>1 >0 <>1 .set ,1
+    ><0 1 .sub <0 ? ><0 .loop : ,3 $
+;
+
+@main[*int,*int,int]
+    .BeginDrawing
+        <0 .w 1 .sub >1 .drawLine
+    .EndDrawing
+
+    .w 1 .sub >0 >1 .update ><0 <>1 ><0
+    1 .add <0 .h .sub .isneg ? : ,1 0 $
+
+    .WindowShouldClose ? ,3 : .loop $
+;
+
+{
+    2 *int
+    2 *int
+    0 1 .set
+    0 .main
+}
+.CloseWindow
