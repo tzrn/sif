@@ -3,9 +3,10 @@
 @h:i 660;
 @b:i 10;
 @bw:i 60;
+@drawfps:i 0;
 
 .w .h "life" .InitWindow
-10 .SetTargetFPS
+.drawfps .SetTargetFPS
 
 @getCoord[int][int]
     <0 .isneg ? ,1 59 .ret : $
@@ -61,7 +62,7 @@
     >0 .bw .div (y,x)
     .b 1 .add .mul <>1
     .b 1 .add .mul
-    .b <0 >0 >0 .mul .i2f f1 f1 .ColorFromHSV .DrawRectangle : $
+    .b <0 >0 .i2f f3600 .fdiv f360 .fmul f1 f1 .ColorFromHSV .DrawRectangle : $
     >0 ? <>1 1 .sub <>1 .loop : ,2 .ret $
 ;
 
@@ -80,27 +81,42 @@
     ><0 1 .sub <0 .isneg ? ,1 : .loop $
 ;
 
-@main[*int,*int]
-    .BeginDrawing
-        #FF330033 .ClearBackground
-        3600 <1 .drawBoard
-    .EndDrawing
-
-    3600 .updateBoard <>1
-
-    .WindowShouldClose ?
-    ,2 .ret : .loop $
+@lim[int][int]
+    >0 .bw .sub .isneg ? :
+        ,1 0
+    $
 ;
 
-@fill[int,*int]
-    >0 >0 51 .div <>1 ,1 9 .div ,1 2 .div <>1 ,1 .set
-    >0 ? >0 1 .sub ><0 ,1 .loop : ,2 $
+@getPos[][int]
+    .GetMouseX .b 1 .add .div ,1 .lim
+    .GetMouseY .b 1 .add .div ,1 .lim .bw .mul .add
+;
+
+@main[int,*int,*int]
+    .BeginDrawing
+        #FF330033 .ClearBackground
+        3600 >1 .drawBoard
+    .EndDrawing
+
+    .KEY_S .KeyPressed ? 
+        ><0 .not
+        <0 ? 5 .SetTargetFPS : .drawfps .SetTargetFPS $
+        ><0 <>1
+    : $
+    
+    >0 ? 3600 .updateBoard <>1 :
+        0 .IsMouseButtonDown ? >1 .getPos 1 .set ,1 : $
+        1 .IsMouseButtonDown ? >1 .getPos 0 .set ,1 : $
+    $
+
+    .WindowShouldClose ?
+    ,3 .ret : .loop $
 ;
 
 {
+    0
     8 *int
     8 *int
-    3600 <1 .fill
     .main
 }
 .CloseWindow

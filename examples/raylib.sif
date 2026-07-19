@@ -9,13 +9,16 @@
 !DrawCircle[int,int,float,int]
 !DrawRectangle[int,int,int,int,int]
 !IsKeyDown[int][int]
+!IsKeyPressed[int][int]
 !DrawFPS[int,int][]
 !DrawPixel[int,int,int][]
 !ColorFromHSV[float,float,float][int]
+!IsMouseButtonDown[int][int]
+!GetMouseX[][int]
+!GetMouseY[][int]
 
-@KeyDown[int][int]
-    .IsKeyDown 1 .and
-;
+@KeyDown[int][int]    .IsKeyDown    1 .and;
+@KeyPressed[int][int] .IsKeyPressed 1 .and;
 
 @key[][int] 0;
 @KEY_A:key 65;

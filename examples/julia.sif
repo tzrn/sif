@@ -24,12 +24,16 @@
     f100 .fmul .f2i .ipr "\n" .pr
 ;
 
+@fsq[float][float]
+    <0 .fmul
+;
+
 @calcPoint[*float,int,float,float][float]
     (n,x,y)
     >2 >3 .cmul
     >0 0 .get <>1 1 .get <>1 ,1 .cadd
-    <1 <1 .fadd f0.3 .fadd .f2i .isneg ? ,4 f-1 .ret :
-        ><1 1 .sub <0 .isneg ? ,1 .fadd <>1 ,1 : ><1 .loop $
+    <1 .fsq <1 .fsq .fadd .f2i .isneg ? ,4 f-1 .ret :
+        ><1 1 .sub <0 .isneg ? ,1 .fsq <>1 .fsq .fadd <>1 ,1 : ><1 .loop $
     $
 ;
 
@@ -41,7 +45,7 @@
     (calculate and point and draw it)
     >1 >2
 
-    >0 30 >1 .i2f >2 .i2f
+    >0 100 >1 .i2f >2 .i2f
     (n,x,y)
     <>1 >0 2 .get, .fmul .w .i2f .fdiv >0 3 .get, .fsub
     <>1 >0 2 .get, .fmul .h .i2f .fdiv >0 3 .get, .fsub
@@ -84,8 +88,8 @@
     1 f0.15 .set
 
     (scale,offset)
-    2 f3 .set
-    3 f1.5 .set
+    2 f0.2 .set
+    3 f0.1 .set
     .main
 }
 .CloseWindow
