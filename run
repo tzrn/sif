@@ -1,10 +1,7 @@
 #!/bin/sh
 name=$(basename ${1%.*})
 libs=$(find lib -name *.a)
-tmp=$(mktemp)
-cat $@ > $tmp
-python3 main.py $tmp > output/$name.asm &&
+python3 main.py $@ > output/$name.asm &&
 fasm output/$name.asm output/$name.o > /dev/null &&
 gcc -no-pie -o output/$name output/$name.o -I./include -L./lib -lraylib -lGL -lm -lpthread -ldl -lrt -lX11 &&
 output/$name
-rm $tmp

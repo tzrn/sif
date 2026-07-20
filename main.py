@@ -1,7 +1,9 @@
 import sys
 
-with open(sys.argv[1], "r") as f:
-    source = f.read() + " "
+source = ""
+for fname in sys.argv[1:]:
+    with open(fname, "r") as f:
+        source += f.read() + "\n"
 
 i = 0
 l = len(source)
